@@ -23,7 +23,6 @@
 　　      |- [bin]
 　　      |   |- gendic.sh    : IPADICからMONMPRP用の辞書をビルドします
 　　      |   |- parse.sh     : 形態素解析を行います
-　　      |   |- testdata.sh  : テストデータを作ります(HTMLパースの為、node と jsdom@0.2.9 getopt が必要です)
 　　      |- [lib]            : 
 　　      |   |- *            : スクリプト群
 　　      |- [data]           : 一時データ用
