@@ -90,5 +90,5 @@ while (elems.hasNext()){
 }
 _dictionary_tmp.drop();
 
-_dictionary.ensureIndex({w:1},{unique:1});
+_dictionary.ensureIndex({w:1});
 _dictionary.ensureIndex({t:1});

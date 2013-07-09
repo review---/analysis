@@ -19,6 +19,7 @@ Options :
     -f, --field      : Target field
     -q, --query      : Target document
     -o, --output     : Output collection ns
+    -i, --input      : Input sentense directly
                      :  Output STDIO when specfy '-'
 USAGE
   exit $1
@@ -29,7 +30,8 @@ EVAL=''
 VFLG='var _VFLG=false;'
 DIC='var _DIC="analysis.dictionary";'
 QUERY='var _QUERY={};'
-OPTIONS=`getopt -o hD:c:f:q:o:V --long help,dictionary:,collection:,field:,query:,output:,verbose, -- "$@"`
+SENTENSE='var _SENTENSE=false;'
+OPTIONS=`getopt -o hD:c:f:q:o:i:V --long help,dictionary:,collection:,field:,query:,output:,input:,verbose, -- "$@"`
 if [ $? != 0 ] ; then
   exit 1
 fi
@@ -43,11 +45,12 @@ while true; do
 				-f|--field)      EVAL="${EVAL}var _FIELD='${OPTARG}';";shift;;
 				-q|--query)      QUERY="var _QUERY=${OPTARG};";shift;;
 				-o|--output)     EVAL="${EVAL}var _OUT='${OPTARG}';";shift;;
+				-i|--input)      SENTENSE="var _SENTENSE='${OPTARG}';";shift;;
 				-V|--verbose)    VFLG="var _VFLG=true;";;
 				--) shift;break;;
 				*) echo "Internal error! " >&2; exit 1 ;;
     esac
 		shift
 done
-${MONGO_SHELL} --quiet --eval "${EVAL}${VFLG}${DIC}${QUERY}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js
+${MONGO_SHELL} --quiet --eval "${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js
 

@@ -200,7 +200,7 @@ JPParser.prototype.next = function(candidate,sentence){
 
 JPParser.prototype.parse_original = function(sentence,word,type,query){
 	var candidate = this._dictionary.findOne({w:word});
-	if ( candidate ) {
+	if ( ! candidate ) {
 		this._dictionary.save({w:word,l:word.length,c:0,s:300,t:["名詞","ORG",type],p:[word]});
 		candidate = this._dictionary.findOne({w:word});
 	}
@@ -357,7 +357,6 @@ JPParser.prototype.parse_doc = function(docid,doc){
 }
 
 
-var _target_name = _COL.split('\.');
 
 var _dictionary_name = _DIC.split('\.');
 var _db = db.getMongo().getDB(_dictionary_name.shift());
@@ -384,13 +383,20 @@ if ( _OUT === '-' ) {
 
 var parser = new JPParser(_dictionary,_dst,_VFLG);
 
+if ( _SENTENSE ) {
+	parser.parse_doc(0,_SENTENSE);
+	quit();
+}
+var _target_name = _COL.split('\.');
 var _src = db.getMongo().getDB(_target_name.shift()).getCollection(_target_name.join('\.'));
-//var docs = _src.find(_QUERY);
-//while ( docs.hasNext()){
-//	var doc = docs.next();
-//	print(doc._id);
-//	parser.parse_doc(doc._id,utils.getField(doc,_FIELD));
-//}
+var docs = _src.find(_QUERY);
+while ( docs.hasNext()){
+	var doc = docs.next();
+	print(doc._id);
+	parser.parse_doc(doc._id,utils.getField(doc,_FIELD));
+}
+
+// -------------- for debug ------------------
 //var doc = {body:"ABCZXが23.5万個のABCとBBBB-CCCCになった。私AbbbBC。私ABC。ＡＢＣＺＸが２３．５万個のＡＢＣとＢＢＢＢ‐ＣＣＣＣになった。私ＡｂｂｂＢＣ。私ＡＢＣ。"};
 //parser.parse_doc(990,doc.body);
 //var doc = {body:"今回私は十分に実行され、一部がなんとかかんとか。"};
@@ -417,9 +423,6 @@ var _src = db.getMongo().getDB(_target_name.shift()).getCollection(_target_name.
 //parser.parse_doc(1001,doc.body);
 //var doc = {body:"ビルドする、、"};
 //parser.parse_doc(1002,doc.body);
-var doc = {body:"バージョン2.2対応の、、"};
-parser.parse_doc(1003,doc.body);
-
-
-
+//var doc = {body:"バージョン2.2対応の、、"};
+//parser.parse_doc(1003,doc.body);
 

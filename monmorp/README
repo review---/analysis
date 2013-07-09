@@ -15,16 +15,52 @@
 　　MongoDB上に辞書を持ち、外来語や数値などを検出して、解析中にも辞書をアップデートしながら解析します。
 
 * ディレクトリ構成
-　　[monmorp]
-      |- README
-      |- [bin]
-      |   |- gendic.sh    : IPADICからMONMPRP用の辞書をコンパイルします
-      |   |- parse.sh     : 形態素解析を行います
-      |   |- testdata.sh  : テストデータを作ります(HTMLパースの為、node と jsdom@0.2.9 getopt が必要です)
-      |- [lib]            : 
-      |   |- *            : スクリプト群
-      |- [data]           : 一時データ用
-      |- [html]           : testdata.sh用
+
+　　[analysis]
+　　　|- mongo.env            : MongoDBのパスを設定
+　　　|- [monmorp]
+　　      |- README
+　　      |- [bin]
+　　      |   |- gendic.sh    : IPADICからMONMPRP用の辞書をビルドします
+　　      |   |- parse.sh     : 形態素解析を行います
+　　      |   |- testdata.sh  : テストデータを作ります(HTMLパースの為、node と jsdom@0.2.9 getopt が必要です)
+　　      |- [lib]            : 
+　　      |   |- *            : スクリプト群
+　　      |- [data]           : 一時データ用
+　　      |   |- testdata.json: テストデータ
+　　      |- [html]           : testdata.sh用
+
+* クイックスタート
+　　０．mongo.envを編集するか環境変数を設定
+
+　　　　　それぞれのコマンドのパスを設定する
+
+　　１．IPA辞書をダウンロード
+
+　　　　　pushd ./data
+　　　　　wget http://iij.dl.sourceforge.jp/ipadic/24435/ipadic-2.7.0.tar.gz
+　　　　　tar xzf ipadic-2.7.0.tar.gz
+　　　　　popd
+
+　　２．辞書をビルド（辞書コレクション＝"analysis.dictionary"
+
+　　　　　./bin/gendic.sh -D analysis.dictionary -i data/ipadic-2.7.0
+
+　　３．動作確認（形態素解析結果が出力されます
+
+　　　　　./bin/parse.sh -D analysis.dictionary -i "こんにちは世界。" -o - -V
+
+　　４．テストデータをMongoDBに投入
+
+　　　　　mongoimport --drop -d test -c testdoc --file data/testdata.json
+
+　　５．複数ドキュメントを一気に解析
+
+　　　　　./bin/parse.sh -D analysis.dictionary -c test.testdoc -f body -o test.out
+
+　　６．結果を確認
+
+　　　　　mongo test <<<'db.out.find().sort({docid:1,pos:1})'
 
 
 * 既知の問題
@@ -74,4 +110,3 @@
 　３．解析速度
 
 　　　まだ並列化が出来ていないので、大量のドキュメントを処理する程の能力はありません。
-
