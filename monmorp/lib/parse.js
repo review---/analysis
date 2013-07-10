@@ -194,11 +194,12 @@ JPParser.prototype.parse_query = function(cur,sentence,query){
 //			query.w = { '$regex':'^'+sentence[0]};
 	}
 	while(true){
+		this.nquery++;
 		var candidates = this._dictionary.find(query).sort({l:-1,s:1});
 		while( candidates.hasNext()){
 			var candidate = candidates.next();
 //print(query.h + '   '  + query.w + ' =>  ' + candidate.w);
-			this.count++;
+			this.nfetch++;
 			if ( typeof candidate.w === 'string' ){
 				var head = sentence.substring(0,candidate.w.length);
 				if ( candidate.w !== head ) {
@@ -225,7 +226,7 @@ JPParser.prototype.parse_query = function(cur,sentence,query){
 //var all      = {$in:["名詞","接頭詞","連体詞","形容詞","動詞","副詞","接続詞","助動詞","助詞","その他","記号","フィラー"]};
 var all      = {$in:["名詞","接頭詞","連体詞","形容詞","動詞","副詞","接続詞","助動詞","助詞","フィラー","その他"]};
 var first    = {$in:["名詞","接頭詞","連体詞","形容詞","動詞","副詞","接続詞","感動詞","フィラー"]};
-var noun     = {$in:["名詞","接頭詞","連体詞","形容詞","助詞"]};
+var noun     = {$in:["名詞","接頭詞","連体詞","形容詞","助詞","感動詞"]};
 var verb     = {$in:["名詞","接頭詞","連体詞","形容詞","助動詞","助詞"]};
 //var noun     = {$in:["名詞","接頭詞","連体詞","形容詞","助詞"],$nin:["終助詞"]};
 //var verb     = {$in:["名詞","接頭詞","連体詞","形容詞","助動詞","助詞"],$nin:["終助詞"]};
@@ -280,7 +281,8 @@ JPParser.prototype.result = function(pos,word,candidate) {
 }
 
 JPParser.prototype.parse_doc = function(docid,doc){
-	this.count = 0;
+	this.nquery = 0;
+	this.nfetch = 0;
 	this.docid = docid;
 	this.idx = 0;
 
@@ -346,6 +348,7 @@ var _dst_job;
 if ( _OUT === '-' ) {
 		_dst = { 
 			save : function(ret) {
+				ret.c = _dictionary.findOne({_id:ret.c});
 				print(JSON.stringify(ret));
 			}
 		};
@@ -370,13 +373,10 @@ var parser = new JPParser(_pdictionary,_dictionary,_dst,_VFLG,_nheads);
 if ( _SENTENSE ) {
 	var docid = ISODate();
 	parser.parse_doc(docid,_SENTENSE);
-
-	print ( '    DOCID                  : #COMPARES');
-	print ( JSON.stringify(docid) + ' : ' + parser.count );
+	print ( JSON.stringify(docid) + ' : ' + parser.nquery + ' ( ' + parser.nfetch + ' ) ');
 	quit();
 }
 
-print ( '    DOCID                  : #COMPARES');
 
 var _col_split = _COL.split('\.');
 var _src = db.getMongo().getDB(_col_split.shift()).getCollection(_col_split.join('\.'));
@@ -395,7 +395,7 @@ while ( docs.hasNext()){
 		_dst.remove({docid:doc._id});
 	var doc = _src.findOne({_id:doc._id});
 	parser.parse_doc(doc._id,utils.getField(doc,_FIELD));
-	print ( doc._id + ' : ' + parser.count );
+	print ( doc._id.toString() + ' : ' + parser.nquery + ' ( ' + parser.nfetch + ' ) ');
 }
 
 // -------------- for debug ------------------

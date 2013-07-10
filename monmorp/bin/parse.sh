@@ -58,6 +58,8 @@ while true; do
     esac
 		shift
 done
+
+echo '    DOCID                  : #COMPARES'
 if [ "${JOBS}" = "" ];then
 		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js | grep -v '^loading file:'
 		exit

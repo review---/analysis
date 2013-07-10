@@ -34,6 +34,7 @@ USAGE
 IPADIC=''
 DIC='var _DIC="analysis.dictionary";'
 NHEADS='var _NHEADS = 2;'
+#NHEADS='var _NHEADS = 3;'
 OPTIONS=`getopt -o hD:i:n: --long help,dictionary:ipadic-dir:,nheads: -- "$@"`
 if [ $? != 0 ] ; then
   exit 1
