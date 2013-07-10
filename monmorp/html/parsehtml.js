@@ -67,53 +67,48 @@ try {
 
 //---------------
 // Validate 
-var body = '';
+var html = '';
 if ( FILE ) {
-	body = fs.readFileSync(FILE);
-	gettext('"'+FILE+'" '+body);
+	html = fs.readFileSync(FILE);
+	gettext(FILE,html);
 	return;
 }
 process.stdin.on('data',function(chunk){
-	body += chunk;
+	html += chunk;
 	if ( MULTI ) {
-		body = procline(body,false);
+		html = procline(html,false);
 	}
 });
 process.stdin.on('end',function(){
 	if ( MULTI ) {
-		procline(body,true);
+		procline(html,true);
 		return;
 	}
-	gettext(body);
+	var json = JSON.parse(html);
+	gettext(json._id,json.body);
 });
 return;
 
-function procline(line,end){
-	var bodies = line.split("\n");
+function procline(chunk,end){
+	var lines = chunk.split("\n");
 	var ret;
 	if ( ! end ) {
-		ret = bodies.pop();
+		ret = lines.pop();
 	}
-	for ( var b in bodies ) {
-		var body = bodies[b];
-		if ( ! body ) {
+	for ( var b in lines ) {
+		var line = lines[b];
+		if ( ! line ) {
 			continue;
 		}
-		gettext(body);
+		var json = JSON.parse(line);
+		gettext(json._id,json.body);
 	}
 	return ret;
-
 }
-function gettext(body){
+function gettext(id,body){
 	if ( ! body ) {
 		process.eputs('=== NO BODY ! ===' );
 		process.exit(1);
-	}
-	var id = null;
-	var matches;
-	if ( matches = body.match(/^(\S+)\s+</) ) {
-		id = matches[1];
-		body = body.substring(id.length);
 	}
 	var document = jsdom(body,null,{
 		features:{
@@ -136,7 +131,9 @@ function gettext(body){
 					}
 				});
 			if ( id ) {
-				sys.puts('{ _id:'+id+',body:"'+text+'"}');
+				var ret = { _id : id , body: text };
+				sys.puts(JSON.stringify(ret));
+				//sys.puts('{ _id:'+id+',body:"'+text+'"}');
 			}else{
 				sys.puts('{body:"'+text+'"}');
 			}

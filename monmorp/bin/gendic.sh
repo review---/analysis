@@ -55,10 +55,11 @@ if [ "$IPADIC" != "" ]; then
 		echo '=== PARSE IPADIC ==='
 		perl ${CURDIR}/../lib/parsedic.pl $IPADIC > ${DICJS}
 		echo '=== IMPORT IPADIC ==='
-		${MONGO_IMPORT} --drop -d analysis -c dictionary.ipadic --file ${DICJS}
+		PRIMARY=`${MONGO_SHELL} ${MONGO_NODE} --quiet ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/getprimary.js | tail -n 1`
+		${MONGO_IMPORT} -h ${PRIMARY} --drop -d analysis -c dictionary.ipadic --file ${DICJS}
 fi
 echo '=== BUILDING DICTIONARY ==='
-${MONGO_SHELL} --quiet --eval "${DIC}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/gendic.js
+${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${DIC}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/gendic.js
 echo '=== AMEND DICTIONARY ==='
-${MONGO_SHELL} --quiet --eval "${DIC}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/amenddic.js
+${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${DIC}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/amenddic.js
 echo '=== COMPLETE ==='

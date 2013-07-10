@@ -19,6 +19,17 @@ wget 'http://ja.wikipedia.org/wiki/Firebird'
 wget 'http://ja.wikipedia.org/wiki/Apache_Tomcat'
 wget 'http://ja.wikipedia.org/wiki/Apache_ZooKeeper'
 wget 'http://ja.wikipedia.org/wiki/Hadoop'
+wget 'http://ja.wikipedia.org/wiki/Apache_HTTP_Server'
+wget 'http://ja.wikipedia.org/wiki/Apache_Ant'
+wget 'http://ja.wikipedia.org/wiki/Apache_Axis2'
+wget 'http://ja.wikipedia.org/wiki/Apache_Maven'
+wget 'http://ja.wikipedia.org/wiki/Log4j'
+wget 'http://ja.wikipedia.org/wiki/Perl6'
+wget 'http://ja.wikipedia.org/wiki/Rust_(%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E8%A8%80%E8%AA%9E)'
+wget 'http://ja.wikipedia.org/wiki/Erlang'
+wget 'http://ja.wikipedia.org/wiki/Python'
+wget 'http://ja.wikipedia.org/wiki/Ruby'
+wget 'http://ja.wikipedia.org/wiki/R%E8%A8%80%E8%AA%9E'
 popd
 
 HTMLDATAJS="${CURDIR}/../data/htmldata.json"
@@ -30,11 +41,10 @@ fi
 for f in `find ${HTMLDIR} -type f | grep -v '.gitignore'`; do ((echo '{body:"'; cat $f  | sed -e 's/\\/\\\\/g' | sed -e 's/$/\\n/g' | sed -e 's/\t/\\t/g' | sed -e 's/"/\\"/g' ; echo '"}') | tr  -d '\n' ) ;echo ; done > ${HTMLDATAJS}
 
 echo '=== IMPORT HTML TESTDATA (files => test.testdoc.html ) ==='
-${MONGO_IMPORT} --drop -d test -c testdoc.html --file ${HTMLDATAJS}
+PRIMARY=`${MONGO_SHELL} ${MONGO_NODE} --quiet ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/getprimary.js | tail -n 1`
+${MONGO_IMPORT} -h ${PRIMARY} --drop -d test -c testdoc.html --file ${HTMLDATAJS}
 
 echo '=== COMVERT FROM HTML TO TEXT (test.testdoc.html => test.testdoc ) ==='
-${MONGO_SHELL} --quiet --eval "var _COL='test.testdoc.html';var _BODY='body';" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/exportdocs.js | grep -v '^loading file:' | while read line; do
-		echo $line | ${CURDIR}/../html/parsehtml.js
-done > ${TESTDATAJS}
+${MONGO_EXPORT} -h ${PRIMARY} -d test -c testdoc.html -f _id,body | ${CURDIR}/../html/parsehtml.js -m > ${TESTDATAJS}
 
-${MONGO_IMPORT} --drop -d test -c testdoc --file ${TESTDATAJS}
+${MONGO_IMPORT} -h ${PRIMARY} --drop -d test -c testdoc --file ${TESTDATAJS}

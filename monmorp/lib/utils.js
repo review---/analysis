@@ -31,3 +31,16 @@ var utils = {
 		return get(data,field.split('\.'));
 	}
 }
+
+var _pmongo = db.getMongo();
+if ( ! rs.isMaster().ismaster ) {
+	for ( var i in rs.status().members ) {
+		var member = rs.status().members[i];
+		if ( member.state === 1 ) {
+			var conn = connect(member.name+'/'+db.getName());
+			_pmongo = conn.getMongo();
+			rs.slaveOk();
+			break;
+		}
+	}
+}

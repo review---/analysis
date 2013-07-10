@@ -1,7 +1,7 @@
-var _dictionary_name = _DIC.split('\.');
-var _db = db.getMongo().getDB(_dictionary_name.shift());
+var _dic_split = _DIC.split('\.');
+var _db = _pmongo.getDB(_dic_split.shift());
 
-var _DICTIONARY     = _dictionary_name.join('\.');
+var _DICTIONARY     = _dic_split.join('\.');
 var _DICTIONARY_TMP = _DICTIONARY+'.tmp';
 var _DICTIONARY_ORG = _DICTIONARY+'.ipadic';
 
@@ -78,6 +78,8 @@ _db.getCollection(_DICTIONARY_ORG).mapReduce (
 					}
 				}
 );
+
+print('=== IMPORT BUILT DICTIONARY ===');
 
 var _dictionary_tmp = _db.getCollection(_DICTIONARY_TMP);
 var _dictionary = _db.getCollection(_DICTIONARY);

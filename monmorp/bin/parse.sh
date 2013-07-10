@@ -61,12 +61,12 @@ if [ "${JOBS}" = "" ];then
 		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js
 		exit
 fi
-EXEC='('
+WAIT=''
+EXEC=''
 for i in `eval echo "{1..${JOBS}}"`; do
-		if [ "$i" != "1" ];then
-				EXEC=${EXEC}' & '
-		fi
-		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}\\" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js;`"
+		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}\\" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js;` & WAIT=\"\${WAIT} \$!\";"
 done
-EXEC=${EXEC}')'
 eval $EXEC
+for p in $WAIT; do
+		wait $p
+done

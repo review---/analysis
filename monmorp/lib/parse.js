@@ -1,4 +1,5 @@
-function JPParser (_dictionary,_dst,unknown) {
+function JPParser (_pdictionary,_dictionary,_dst,unknown) {
+	this._pdictionary= _pdictionary;
 	this._dictionary = _dictionary;
 	this._dst        = _dst;
 	this.unknown     = unknown;
@@ -201,8 +202,12 @@ JPParser.prototype.next = function(candidate,sentence){
 JPParser.prototype.parse_original = function(sentence,word,type,query){
 	var candidate = this._dictionary.findOne({w:word});
 	if ( ! candidate ) {
-		this._dictionary.save({w:word,l:word.length,c:0,s:300,t:["名詞","ORG",type],p:[word]});
-		candidate = this._dictionary.findOne({w:word});
+		candidate = this._pdictionary.findAndModify({
+			query:{w:word},
+			update:{ $setOnInsert:{w:word,l:word.length,c:0,s:300,t:["名詞","ORG",type],p:[word]}},
+			upsert:true,
+			new:true
+		});
 	}
 	return this.next(candidate,sentence);
 }
@@ -359,9 +364,11 @@ JPParser.prototype.parse_doc = function(docid,doc){
 
 
 
-var _dictionary_name = _DIC.split('\.');
-var _db = db.getMongo().getDB(_dictionary_name.shift());
-var _dictionary = _db.getCollection(_dictionary_name.join('\.'));
+var _dic_split    = _DIC.split('\.');
+var _dictionary_db_name = _dic_split.shift();
+var _dictionary_col_name = _dic_split.join('\.');
+var _dictionary  = db.getMongo().getDB(_dictionary_db_name).getCollection(_dictionary_col_name);
+var _pdictionary = _pmongo.getDB(_dictionary_db_name).getCollection(_dictionary_col_name);
 if( ! _dictionary.stats().count ) {
 	print('*** Invalid dictionary : ' + _DIC);
 	quit();
@@ -376,12 +383,12 @@ if ( _OUT === '-' ) {
 			}
 		};
 }else{
-	var _out_name     = _OUT.split('\.');
-	var _dst_db       = _out_name.shift();
-	var _dst_name     = _out_name.join('\.');
+	var _out_split    = _OUT.split('\.');
+	var _dst_db       = _out_split.shift();
+	var _dst_name     = _out_split.join('\.');
 	var _dst_job_name = _dst_name + '.job';
-		_dst     = db.getMongo().getDB(_dst_db).getCollection(_dst_name);
-		_dst_job = db.getMongo().getDB(_dst_db).getCollection(_dst_job_name);
+		_dst     = _pmongo.getDB(_dst_db).getCollection(_dst_name);
+		_dst_job = _pmongo.getDB(_dst_db).getCollection(_dst_job_name);
 	this._dst.ensureIndex({docid:1,idx:1});
 }
 if ( _CJOB ) {
@@ -391,29 +398,19 @@ if ( _CJOB ) {
 	quit();
 }
 
-var parser = new JPParser(_dictionary,_dst,_VFLG);
+var parser = new JPParser(_pdictionary,_dictionary,_dst,_VFLG);
 
 if ( _SENTENSE ) {
 	parser.parse_doc(ISODate(),_SENTENSE);
 	quit();
 }
 
-// (ms)
-var _TIMEOUT     = 300000;
-
-var _target_name = _COL.split('\.');
-var _src = db.getMongo().getDB(_target_name.shift()).getCollection(_target_name.join('\.'));
+var _col_split = _COL.split('\.');
+var _src = db.getMongo().getDB(_col_split.shift()).getCollection(_col_split.join('\.'));
 var docs = _src.find(_QUERY,{_id:1});
 while ( docs.hasNext()){
 	var doc = docs.next();
-	var flg = _dst_job.find({_id:doc._id}).limit(1).count();
-	if ( flg ) {
-		var timestamp = _dst_job.findOne({_id:doc._id});
-		if ( ISODate() - timestamp.tm < _TIMEOUT ) {
-			continue;
-		}
-			_dst_job.remove({_id:doc._id});
-	}
+
 	var prev = _dst_job.findAndModify({
 		query: {_id:doc._id},
 		update:{ $setOnInsert:{ tm:ISODate()}},
