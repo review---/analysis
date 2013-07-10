@@ -5,7 +5,7 @@ var _DICTIONARY     = _dic_split.join('\.');
 var _DICTIONARY_TMP = _DICTIONARY+'.tmp';
 var _DICTIONARY_ORG = _DICTIONARY+'.ipadic';
 
-
+print('== NHEADS: ' + _NHEADS + ' ==');
 
 var TYPELIST = {
 		"記号"    :  10,
@@ -71,10 +71,11 @@ _db.getCollection(_DICTIONARY_ORG).mapReduce (
 					scope: { 
 						TYPELIST:TYPELIST,
 						utils: utils,
-						morpho: morpho
+						morpho: morpho,
+						nheads: _NHEADS
 					},
 					finalize : function(key,val){
-						return morpho.forms(val);
+						return morpho.forms(nheads,val);
 					}
 				}
 );
@@ -85,6 +86,7 @@ var _dictionary_tmp = _db.getCollection(_DICTIONARY_TMP);
 var _dictionary = _db.getCollection(_DICTIONARY);
 _dictionary.drop();
 
+_dictionary.save({w:'.meta',nheads:_NHEADS});
 var elems= _dictionary_tmp.find();
 while (elems.hasNext()){
 	var elem = elems.next();
@@ -92,5 +94,7 @@ while (elems.hasNext()){
 }
 _dictionary_tmp.drop();
 
+
 _dictionary.ensureIndex({w:1});
+_dictionary.ensureIndex({h:1,l:-1,s:1});
 _dictionary.ensureIndex({t:1});

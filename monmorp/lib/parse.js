@@ -1,8 +1,9 @@
-function JPParser (_pdictionary,_dictionary,_dst,unknown) {
+function JPParser (_pdictionary,_dictionary,_dst,unknown,nheads) {
 	this._pdictionary= _pdictionary;
 	this._dictionary = _dictionary;
 	this._dst        = _dst;
 	this.unknown     = unknown;
+	this.nheads      = nheads;
 }
 
 JPParser.prototype.form = function(sentence,candidate) {
@@ -16,6 +17,14 @@ JPParser.prototype.form = function(sentence,candidate) {
 				if ( kind === 1 ) {
 					candidate.l = word.length;
 					ret = [candidate];
+				}else if ( kind === 4 ) {
+					if ( ret === null || ret[0].l <= word.length ) {
+						var follow = this.parse_query(candidate,sentence.substring(word.length),{w:'*',t:{'$in':["名詞"]}});
+						if ( follow ) {
+							candidate.l = word.length;
+							return [candidate].concat(follow);
+						}
+					}
 				}else if ( kind === 2 ) {
 					if ( ret === null || ret[0].l <= word.length ) {
 						var follow = this.parse_query(candidate,sentence.substring(word.length),{w:'*',t:{'$in':["助動詞","助詞"]}});
@@ -40,57 +49,6 @@ JPParser.prototype.form = function(sentence,candidate) {
 	}
 	return ret;
 }
-
-//JPParser.prototype.conjugated_form = function(sentence,candidate,num,tails1,tails2,tails3) {
-//	var ret = null;
-//	var len = candidate.l;
-//	var base = candidate.w.substring(0,len-num);
-//	for ( var i in tails1 ) {
-//		var cmp = base + tails1[i];
-//		var head = sentence.substring(0,cmp.length);
-//		if ( head === cmp ) {
-//			candidate.l = cmp.length;
-//			ret = [candidate];
-//		}
-//	}
-//	for ( var i in tails2 ) {
-//		var cmp = base + tails2[i];
-//		if ( ret === null || ret[0].l <= cmp.length ) {
-//			var head = sentence.substring(0,cmp.length);
-//			if ( head === cmp ) {
-//				{
-//					var follow = this.parse_query(candidate,sentence.substring(cmp.length),{w:'*',t:{'$in':["助詞"]}});
-//					if ( follow ) {
-//						candidate.l = cmp.length;
-//						return [candidate].concat(follow);
-//					}
-//				}
-//				{
-//					var follow = this.parse_query(candidate,sentence.substring(cmp.length),{t:{'$in':["助動詞"]}});
-//					if ( follow ) {
-//						candidate.l = cmp.length;
-//						return [candidate].concat(follow);
-//					}
-//				}
-//			}
-//		}
-//	}
-//	for ( var i in tails3 ) {
-//		var cmp = base + tails3[i];
-//		if ( ret === null || ret[0].l <= cmp.length ) {
-//			var head = sentence.substring(0,cmp.length);
-//			if ( head === cmp ) {
-//				candidate.l = cmp.length;
-//				var follow = this.parse_query(candidate,sentence.substring(cmp.length),{w:'*',t:{'$in':["動詞"]}});
-//				if ( follow ) {
-//					return [candidate].concat(follow);
-//				}
-//				return [candidate];
-//			}
-//		}
-//	}
-//	return ret;
-//}
 
 function ascii2multi(str){
 	var ret = '';
@@ -159,39 +117,39 @@ function katakana(str){
 
 
 
-JPParser.prototype.next = function(candidate,sentence){
+JPParser.prototype.search_follows = function(candidate,sentence){
 	if ( utils.array_in(candidate.t,"名詞接続") ) {
-		var follow = this.parse_query(candidate,sentence.substring(candidate.l),{w:'*',t:{'$in':["名詞"]}});
+		var follow = this.parse_query(candidate,sentence,{w:'*',t:{'$in':["名詞"]}});
 		if ( follow ) {
 			return [candidate].concat(follow);
 		}
 	}
 	if ( utils.array_in(candidate.t,"形容動詞語幹") ) {
-		var follow = this.parse_query(candidate,sentence.substring(candidate.l),{w:"だ",t:{'$in':["助動詞"]}});
+		var follow = this.parse_query(candidate,sentence,{w:"だ",t:{'$in':["助動詞"]}});
 		if ( follow ) {
 			return [candidate].concat(follow);
 		}
 	}
 	if ( utils.array_in(candidate.t,"サ変接続") ) {
-		var follow = this.parse_query(candidate,sentence.substring(candidate.l),{w:"する",t:{'$in':["動詞"]}});
+		var follow = this.parse_query(candidate,sentence,{w:"する",t:{'$in':["動詞"]}});
 		if ( follow ) {
 			return [candidate].concat(follow);
 		}
 	}
 	if ( utils.array_in(candidate.t,"副詞可能") ) {
-		var follow = this.parse_query(candidate,sentence.substring(candidate.l),{w:"*",t:adverb})
+		var follow = this.parse_query(candidate,sentence,{w:"*",t:adverb})
 		if ( follow ) {
 			return [candidate].concat(follow);
 		}
 	}
 	if ( utils.array_in(candidate.t,"名詞") ) {
-		var follow = this.parse_query(candidate,sentence.substring(candidate.l),{t:{'$in':["助詞"]}});
+		var follow = this.parse_query(candidate,sentence,{w:"*",t:{'$in':["助詞"]}});
 		if ( follow ) {
 			return [candidate].concat(follow);
 		}
 	}
 //	if ( utils.array_in(candidate.t,"NUMBER") ) {
-//		var follow = this.parse_query(candidate,sentence.substring(candidate.l),{w:'*',t:{'$in':["助数詞"]}});
+//		var follow = this.parse_query(candidate,sentence,{w:'*',t:{'$in':["助数詞"]}});
 //		if ( follow ) {
 //			return [candidate].concat(follow);
 //		}
@@ -202,25 +160,19 @@ JPParser.prototype.next = function(candidate,sentence){
 JPParser.prototype.parse_original = function(sentence,word,type,query){
 	var candidate = this._dictionary.findOne({w:word});
 	if ( ! candidate ) {
+		candidate = morpho.forms(this.nheads,{w:word,l:word.length,c:0,s:300,t:["名詞","ORG",type],h:word[0]});
 		candidate = this._pdictionary.findAndModify({
 			query:{w:word},
-			update:{ $setOnInsert:{w:word,l:word.length,c:0,s:300,t:["名詞","ORG",type],p:[word]}},
+			update:{ $setOnInsert:candidate},
 			upsert:true,
 			new:true
 		});
 	}
-	return this.next(candidate,sentence);
+	return this.search_follows(candidate,sentence.substring(word.length));
 }
  
 
 JPParser.prototype.parse_query = function(cur,sentence,query){
-	if ( query.w === '*' ) {
-		if ( sentence.charCodeAt(0) < 128 ) {
-			query.w = { '$regex':'^'+ascii2multi(sentence[0])};
-		}else{
-			query.w = { '$regex':'^'+sentence[0]};
-		}
-	}
 	if ( sentence.charCodeAt(0) < 128 ) {
 		sentence = ascii2multi(sentence);
 	}
@@ -236,24 +188,38 @@ JPParser.prototype.parse_query = function(cur,sentence,query){
 	}else if ( isIgnore(sentence) ) {
 		return null;
 	}			
-	var candidates = this._dictionary.find(query).sort({l:-1,s:1});
-	while( candidates.hasNext()){
-		var candidate = candidates.next();
-		if ( typeof candidate.w === 'string' ){
-			var head = sentence.substring(0,candidate.l);
-			if ( candidate.w !== head ) {
-				continue
-			}
-			return this.next(candidate,sentence);
-		}else{
-			var ret = this.form(sentence,candidate);
-			if ( ret ) {
-				return ret;
-			}
-			continue;
-		}
+	if ( query.w === '*' ) {
+		delete query.w;
+		query.h = sentence.substring(0,this.nheads);
+//			query.w = { '$regex':'^'+sentence[0]};
 	}
-	return null;
+	while(true){
+		var candidates = this._dictionary.find(query).sort({l:-1,s:1});
+		while( candidates.hasNext()){
+			var candidate = candidates.next();
+//print(query.h + '   '  + query.w + ' =>  ' + candidate.w);
+			this.count++;
+			if ( typeof candidate.w === 'string' ){
+				var head = sentence.substring(0,candidate.w.length);
+				if ( candidate.w !== head ) {
+					continue
+				}
+				return this.search_follows(candidate,sentence.substring(candidate.w.length));
+			}else{
+				var ret = this.form(sentence,candidate);
+				if ( ret ) {
+					return ret;
+				}
+				continue;
+			}
+		}
+		if ( query.h && query.h.length > 1 ) {
+			query.h = query.h.substring(0,query.h.length-1);
+			query.l = query.h.length;
+ 			continue
+		}
+		return null;
+	}
 }
 
 //var all      = {$in:["名詞","接頭詞","連体詞","形容詞","動詞","副詞","接続詞","助動詞","助詞","その他","記号","フィラー"]};
@@ -310,11 +276,11 @@ JPParser.prototype.result = function(pos,word,candidate) {
 		pos:pos,
 		w:word,
 		l:candidate.l,
-		c:candidate._id,
-		t:candidate.t[0]});
+		c:candidate._id});
 }
 
 JPParser.prototype.parse_doc = function(docid,doc){
+	this.count = 0;
 	this.docid = docid;
 	this.idx = 0;
 
@@ -337,13 +303,13 @@ JPParser.prototype.parse_doc = function(docid,doc){
 				var matches = doc.substring(pos,len).match(/^\s+/);
 				if ( matches ) {
 					word = matches[0];
-					candidate = {w:word,l:word.length,s:9999,t:["不明"],p:[word]};
+					candidate = {w:word,l:word.length,s:9999,t:["不明"]};
 				}else{
 					var c = this._dictionary.find({w:ascii2multi(word)}).sort({s:-1}).limit(1);
 					if ( c.count() ) {
 						candidate = c.next();
 					}else{
-						candidate = {w:word,l:word.length,s:9999,t:["不明"],p:[word]};
+						candidate = {w:word,l:word.length,s:9999,t:["不明"]};
 					}
 //if ( utils.array_in(candidate.t,"不明") && word !== '-' && word !== '、' && word !== '.' && word !== '+' && word !== ',' && word !== '・' && word !== '"'){
 //print(doc[pos] + '    ' + doc.substring(pos-20,pos+20) + '    ' + cur.w + ' => ' + cur.t[0]);
@@ -354,7 +320,7 @@ JPParser.prototype.parse_doc = function(docid,doc){
 				cur = candidate;
 			}else{
 				var word = doc[pos];
-				var candidate = {w:word,l:1,s:9999,t:["不明"],p:[word]};
+				var candidate = {w:word,l:1,s:9999,t:["不明"]};
 				pos++;
 				cur = candidate;
 			}
@@ -369,7 +335,8 @@ var _dictionary_db_name = _dic_split.shift();
 var _dictionary_col_name = _dic_split.join('\.');
 var _dictionary  = db.getMongo().getDB(_dictionary_db_name).getCollection(_dictionary_col_name);
 var _pdictionary = _pmongo.getDB(_dictionary_db_name).getCollection(_dictionary_col_name);
-if( ! _dictionary.stats().count ) {
+var _nheads = _dictionary.findOne({w:'.meta'}).nheads;
+if( ! _nheads ) {
 	print('*** Invalid dictionary : ' + _DIC);
 	quit();
 }
@@ -379,7 +346,7 @@ var _dst_job;
 if ( _OUT === '-' ) {
 		_dst = { 
 			save : function(ret) {
-				printjson(ret);
+				print(JSON.stringify(ret));
 			}
 		};
 }else{
@@ -398,12 +365,18 @@ if ( _CJOB ) {
 	quit();
 }
 
-var parser = new JPParser(_pdictionary,_dictionary,_dst,_VFLG);
+var parser = new JPParser(_pdictionary,_dictionary,_dst,_VFLG,_nheads);
 
 if ( _SENTENSE ) {
-	parser.parse_doc(ISODate(),_SENTENSE);
+	var docid = ISODate();
+	parser.parse_doc(docid,_SENTENSE);
+
+	print ( '    DOCID                  : #COMPARES');
+	print ( JSON.stringify(docid) + ' : ' + parser.count );
 	quit();
 }
+
+print ( '    DOCID                  : #COMPARES');
 
 var _col_split = _COL.split('\.');
 var _src = db.getMongo().getDB(_col_split.shift()).getCollection(_col_split.join('\.'));
@@ -420,9 +393,9 @@ while ( docs.hasNext()){
 		continue;
 	}
 		_dst.remove({docid:doc._id});
-	print ( doc._id );
 	var doc = _src.findOne({_id:doc._id});
 	parser.parse_doc(doc._id,utils.getField(doc,_FIELD));
+	print ( doc._id + ' : ' + parser.count );
 }
 
 // -------------- for debug ------------------

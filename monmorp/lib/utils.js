@@ -18,7 +18,13 @@ var utils = {
 		}
 		return false;
 	},
-	
+	heads : function ( arr, n ) {
+		var ret = [];
+		for ( var i = ((arr.length<n)?arr.length:n) ; i >= 1 ; i-- ){
+			ret.push(arr.slice(0,i));
+		}
+		return ret;
+	},
 	getField : function(data,field) {
 		function get(d,f){
 			var k = f.shift();

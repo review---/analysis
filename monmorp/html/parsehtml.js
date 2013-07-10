@@ -127,7 +127,8 @@ function gettext(id,body){
 				$('body').text().split("\n").forEach(function(l){
 					var line = l.replace(/^\s+/,'').replace(/\s+/m,' ');
 					if ( line && line != ' ' ) {
-						text += line.split('"').join('\\"')  + '\\n';
+						// text += line.split('"').join('\\"')  + '\\n';
+						text += line;
 					}
 				});
 			if ( id ) {

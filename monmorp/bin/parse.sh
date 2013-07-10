@@ -13,15 +13,16 @@ Usage :
     Use "gendic.sh" to create dictionary collection.
 
 Options :
-    -h, --help       : This message
-    -D, --dictionary : Dictionary collection ns
-    -c, --collection : Target collection ns
-    -f, --field      : Target field
-    -q, --query      : Target document
-    -o, --output     : Output collection ns
-                     :  Output STDIO when specfy '-'
-    -i, --input      : Input sentense directly
-    -C, --clearjob   : Clear job control info. (Kick once before start parse)
+    -h, --help                : This message
+    -D, --dictionary  ns      : Dictionary collection ns
+    -c, --collection  ns      : Target collection ns
+    -f, --field       name    : Target field
+    -q, --query       query   : Target document
+    -j, --jobs        num     : Number of jobs
+    -o, --output      ns or - : Output collection ns
+                              :  Output STDIO when specfy '-'
+    -i, --input       string  : Input sentense directly
+    -C, --clearjob            : Clear job control info. (Kick once before start parse)
 USAGE
   exit $1
 }
@@ -58,13 +59,13 @@ while true; do
 		shift
 done
 if [ "${JOBS}" = "" ];then
-		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js
+		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js | grep -v '^loading file:'
 		exit
 fi
 WAIT=''
 EXEC=''
 for i in `eval echo "{1..${JOBS}}"`; do
-		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}\\" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js;` & WAIT=\"\${WAIT} \$!\";"
+		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}\\" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js;` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
 done
 eval $EXEC
 for p in $WAIT; do

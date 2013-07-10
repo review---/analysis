@@ -18,6 +18,7 @@ Options :
     -i, --ipadic-dir : IPADIC directory path will get it by extacting ipadic-???.tar.gz. 
                         (ex> ../data/ipadic-2.7.0/
                      : Use old collection instead of clean-created collection if this option is not specfied.
+    -n, --nheads     : #Charactors of word in index.
 
 How to get IPA Dictionary
 
@@ -32,8 +33,8 @@ USAGE
 
 IPADIC=''
 DIC='var _DIC="analysis.dictionary";'
-
-OPTIONS=`getopt -o hD:i: --long help,dictionary:ipadic-dir:, -- "$@"`
+NHEADS='var _NHEADS = 2;'
+OPTIONS=`getopt -o hD:i:n: --long help,dictionary:ipadic-dir:,nheads: -- "$@"`
 if [ $? != 0 ] ; then
   exit 1
 fi
@@ -44,6 +45,7 @@ while true; do
 				-h|--help)       usage 0 ;;
 				-D|--dictionary) DIC="var _DIC='${OPTARG}';";shift;;
 				-i|--ipadic-dir) IPADIC="--ipadic='${OPTARG}'";shift;;
+				-n|--nheads)     NHEADS="var _NHEADS=${OPTARG};";shift;;
 				--) shift;break;;
 				*) echo "Internal error! " >&2; exit 1 ;;
     esac
@@ -59,7 +61,7 @@ if [ "$IPADIC" != "" ]; then
 		${MONGO_IMPORT} -h ${PRIMARY} --drop -d analysis -c dictionary.ipadic --file ${DICJS}
 fi
 echo '=== BUILDING DICTIONARY ==='
-${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${DIC}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/gendic.js
+${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${DIC}${NHEADS}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/gendic.js
 echo '=== AMEND DICTIONARY ==='
-${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${DIC}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/amenddic.js
+${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${DIC}${NHEADS}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/amenddic.js
 echo '=== COMPLETE ==='
