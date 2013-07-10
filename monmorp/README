@@ -55,7 +55,15 @@
 
 　　５．複数ドキュメントを一気に解析
 
+　　　　　./bin/parse.sh -D analysis.dictionary -c test.testdoc -f body -o test.out -C
 　　　　　./bin/parse.sh -D analysis.dictionary -c test.testdoc -f body -o test.out
+
+
+　　　　並列処理する場合：
+
+　　　　　./bin/parse.sh -D analysis.dictionary -c test.testdoc -f body -o test.out -C
+　　　　　./bin/parse.sh -D analysis.dictionary -c test.testdoc -f body -o test.out -j 4
+
 
 　　６．結果を確認
 

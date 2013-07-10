@@ -301,6 +301,7 @@ JPParser.prototype.result = function(pos,word,candidate) {
 	// printjson({s:word,d:candidate.w,t:candidate.t,p:candidate.p,c:candidate});
 	this._dst.save({
 		docid:this.docid,
+		idx: ++this.idx,
 		pos:pos,
 		w:word,
 		l:candidate.l,
@@ -310,8 +311,8 @@ JPParser.prototype.result = function(pos,word,candidate) {
 
 JPParser.prototype.parse_doc = function(docid,doc){
 	this.docid = docid;
-	this._dst.remove({docid:this.docid});
-	
+	this.idx = 0;
+
 	var cur = null;
 	var pos = 0;
 	var len = doc.length;
@@ -367,32 +368,63 @@ if( ! _dictionary.stats().count ) {
 }
 
 var _dst;
+var _dst_job;
 if ( _OUT === '-' ) {
 		_dst = { 
 			save : function(ret) {
 				printjson(ret);
-			},
-			remove : function() {
 			}
 		};
 }else{
-	var _out_name = _OUT.split('\.');
-		_dst = db.getMongo().getDB(_out_name.shift()).getCollection(_out_name.join('\.'));
-	this._dst.ensureIndex({docid:1,pos:1});
+	var _out_name     = _OUT.split('\.');
+	var _dst_db       = _out_name.shift();
+	var _dst_name     = _out_name.join('\.');
+	var _dst_job_name = _dst_name + '.job';
+		_dst     = db.getMongo().getDB(_dst_db).getCollection(_dst_name);
+		_dst_job = db.getMongo().getDB(_dst_db).getCollection(_dst_job_name);
+	this._dst.ensureIndex({docid:1,idx:1});
+}
+if ( _CJOB ) {
+	if ( _dst_job ) {
+		_dst_job.drop();
+	}
+	quit();
 }
 
 var parser = new JPParser(_dictionary,_dst,_VFLG);
 
 if ( _SENTENSE ) {
-	parser.parse_doc(0,_SENTENSE);
+	parser.parse_doc(ISODate(),_SENTENSE);
 	quit();
 }
+
+// (ms)
+var _TIMEOUT     = 300000;
+
 var _target_name = _COL.split('\.');
 var _src = db.getMongo().getDB(_target_name.shift()).getCollection(_target_name.join('\.'));
-var docs = _src.find(_QUERY);
+var docs = _src.find(_QUERY,{_id:1});
 while ( docs.hasNext()){
 	var doc = docs.next();
-	print(doc._id);
+	var flg = _dst_job.find({_id:doc._id}).limit(1).count();
+	if ( flg ) {
+		var timestamp = _dst_job.findOne({_id:doc._id});
+		if ( ISODate() - timestamp.tm < _TIMEOUT ) {
+			continue;
+		}
+			_dst_job.remove({_id:doc._id});
+	}
+	var prev = _dst_job.findAndModify({
+		query: {_id:doc._id},
+		update:{ $setOnInsert:{ tm:ISODate()}},
+		upsert:true
+	});
+	if ( prev ) {
+		continue;
+	}
+		_dst.remove({docid:doc._id});
+	print ( doc._id );
+	var doc = _src.findOne({_id:doc._id});
 	parser.parse_doc(doc._id,utils.getField(doc,_FIELD));
 }
 
