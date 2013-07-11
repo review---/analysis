@@ -41,7 +41,7 @@ fi
 for f in `find ${HTMLDIR} -type f | grep -v '.gitignore'`; do ((echo '{body:"'; cat $f  | sed -e 's/\\/\\\\/g' | sed -e 's/$/\\n/g' | sed -e 's/\t/\\t/g' | sed -e 's/"/\\"/g' ; echo '"}') | tr  -d '\n' ) ;echo ; done > ${HTMLDATAJS}
 
 echo '=== IMPORT HTML TESTDATA (files => test.testdoc.html ) ==='
-PRIMARY=`${MONGO_SHELL} ${MONGO_NODE} --quiet ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/getprimary.js | tail -n 1`
+PRIMARY=`${MONGO_SHELL} ${MONGO_NODE} --quiet ${CURDIR}/../../lib/utils.js ${CURDIR}/../../lib/getprimary.js | tail -n 1`
 ${MONGO_IMPORT} -h ${PRIMARY} --drop -d test -c testdoc.html --file ${HTMLDATAJS}
 
 echo '=== COMVERT FROM HTML TO TEXT (test.testdoc.html => test.testdoc ) ==='

@@ -49,7 +49,7 @@ while true; do
 				-f|--field)      EVAL="${EVAL}var _FIELD='${OPTARG}';";shift;;
 				-q|--query)      QUERY="var _QUERY=${OPTARG};";shift;;
 				-o|--output)     EVAL="${EVAL}var _OUT='${OPTARG}';";shift;;
-				-i|--input)      SENTENSE="var _SENTENSE='${OPTARG}';";shift;;
+				-i|--input)      SENTENSE="var _SENTENSE='`echo \"${OPTARG}\"|tr "\n" " "`';";shift;;
 				-j|--jobs)       JOBS="${OPTARG}";shift;;
 				-C|--clearjob)   CJOB="var _CJOB=true;";;
 				-V|--verbose)    VFLG="var _VFLG=true;";;
@@ -61,13 +61,13 @@ done
 
 echo '    DOCID                  : #COMPARES'
 if [ "${JOBS}" = "" ];then
-		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js | grep -v '^loading file:'
+		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js | grep -v '^loading file:'
 		exit
 fi
 WAIT=''
 EXEC=''
 for i in `eval echo "{1..${JOBS}}"`; do
-		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}\\" ${CURDIR}/../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js;` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
+		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}\\" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js;` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
 done
 eval $EXEC
 for p in $WAIT; do

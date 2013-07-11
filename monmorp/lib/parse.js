@@ -131,7 +131,7 @@ JPParser.prototype.search_follows = function(candidate,sentence){
 		}
 	}
 	if ( utils.array_in(candidate.t,"サ変接続") ) {
-		var follow = this.parse_query(candidate,sentence,{w:"する",t:{'$in':["動詞"]}});
+		var follow = this.parse_query(candidate,sentence,{w:{'$in':["できる","する"]},t:{'$in':["動詞"]}});
 		if ( follow ) {
 			return [candidate].concat(follow);
 		}
@@ -143,7 +143,7 @@ JPParser.prototype.search_follows = function(candidate,sentence){
 		}
 	}
 	if ( utils.array_in(candidate.t,"名詞") ) {
-		var follow = this.parse_query(candidate,sentence,{w:"*",t:{'$in':["助詞"]}});
+		var follow = this.parse_query(candidate,sentence,{w:"*",t:{'$in':["助詞","名詞"]}});
 		if ( follow ) {
 			return [candidate].concat(follow);
 		}
