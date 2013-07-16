@@ -108,6 +108,7 @@ function procline(chunk,end){
 function gettext(id,body){
 	if ( ! body ) {
 		process.eputs('=== NO BODY ! ===' );
+		process.eputs(id['$oid']);
 		process.exit(1);
 	}
 	var document = jsdom(body,null,{
@@ -124,7 +125,7 @@ function gettext(id,body){
 			$('script').text('');
 			$('style').text('');
 			var text ='';
-				$('body').text().split("\n").forEach(function(l){
+				$('#content').text().split("\n").forEach(function(l){
 					var line = l.replace(/^\s+/,'').replace(/\s+/m,' ');
 					if ( line && line != ' ' ) {
 						// text += line.split('"').join('\\"')  + '\\n';

@@ -195,9 +195,9 @@ JPParser.prototype.parse_query = function(cur,sentence,query){
 	}
 	while(true){
 		this.nquery++;
-		var candidates = this._dictionary.find(query).sort({l:-1,s:1});
-		while( candidates.hasNext()){
-			var candidate = candidates.next();
+		var _c_dictionary = this._dictionary.find(query).sort({l:-1,s:1});
+		while( _c_dictionary.hasNext()){
+			var candidate = _c_dictionary.next();
 //print(query.h + '   '  + query.w + ' =>  ' + candidate.w);
 			this.nfetch++;
 			if ( typeof candidate.w === 'string' ){
@@ -272,9 +272,9 @@ JPParser.prototype.parse_token = function(cur,sentence){
 JPParser.prototype.result = function(pos,word,candidate) {
 	// printjson({s:word,d:candidate.w,t:candidate.t,p:candidate.p,c:candidate});
 	this._dst.save({
-		docid:this.docid,
-		idx: ++this.idx,
-		pos:pos,
+		d:this.docid,
+		i: ++this.idx,
+		p:pos,
 		w:word,
 		l:candidate.l,
 		c:candidate._id});
@@ -307,9 +307,9 @@ JPParser.prototype.parse_doc = function(docid,doc){
 					word = matches[0];
 					candidate = {w:word,l:word.length,s:9999,t:["不明"]};
 				}else{
-					var c = this._dictionary.find({w:ascii2multi(word)}).sort({s:-1}).limit(1);
-					if ( c.count() ) {
-						candidate = c.next();
+					var _c_dictionary = this._dictionary.find({w:ascii2multi(word)}).sort({s:-1}).limit(1);
+					if ( _c_dictionary.count() ) {
+						candidate = _c_dictionary.next();
 					}else{
 						candidate = {w:word,l:word.length,s:9999,t:["不明"]};
 					}
@@ -329,8 +329,6 @@ JPParser.prototype.parse_doc = function(docid,doc){
 		}
 	}
 }
-
-
 
 var _dic_split    = _DIC.split('\.');
 var _dictionary_db_name = _dic_split.shift();
@@ -359,7 +357,7 @@ if ( _OUT === '-' ) {
 	var _dst_job_name = _dst_name + '.job';
 		_dst     = _pmongo.getDB(_dst_db).getCollection(_dst_name);
 		_dst_job = _pmongo.getDB(_dst_db).getCollection(_dst_job_name);
-	this._dst.ensureIndex({docid:1,idx:1});
+	this._dst.ensureIndex({d:1,i:1});
 }
 if ( _CJOB ) {
 	if ( _dst_job ) {
@@ -368,7 +366,7 @@ if ( _CJOB ) {
 	quit();
 }
 
-var parser = new JPParser(_pdictionary,_dictionary,_dst,_VFLG,_nheads);
+var parser = new JPParser(_pdictionary,_dictionary,_dst,_VERBOSE,_nheads);
 
 if ( _SENTENSE ) {
 	var docid = ISODate();
@@ -378,11 +376,11 @@ if ( _SENTENSE ) {
 }
 
 
-var _col_split = _COL.split('\.');
-var _src = db.getMongo().getDB(_col_split.shift()).getCollection(_col_split.join('\.'));
-var docs = _src.find(_QUERY,{_id:1});
-while ( docs.hasNext()){
-	var doc = docs.next();
+var _src_split = _SRC.split('\.');
+var _src = db.getMongo().getDB(_src_split.shift()).getCollection(_src_split.join('\.'));
+var _c_src = _src.find(_QUERY,{_id:1});
+while ( _c_src.hasNext()){
+	var doc = _c_src.next();
 
 	var prev = _dst_job.findAndModify({
 		query: {_id:doc._id},

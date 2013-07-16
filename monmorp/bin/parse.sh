@@ -14,14 +14,14 @@ Usage :
 
 Options :
     -h, --help                : This message
-    -D, --dictionary  ns      : Dictionary collection ns
-    -c, --collection  ns      : Target collection ns
+    -d, --dictionary  ns      : Dictionary collection ns
+    -s, --source      ns      : Target collection ns
     -f, --field       name    : Target field
     -q, --query       query   : Target document
-    -j, --jobs        num     : Number of jobs
     -o, --output      ns or - : Output collection ns
                               :  Output STDIO when specfy '-'
     -i, --input       string  : Input sentense directly
+    -j, --jobs        num     : Number of jobs
     -C, --clearjob            : Clear job control info. (Kick once before start parse)
 USAGE
   exit $1
@@ -29,13 +29,13 @@ USAGE
 
 
 EVAL=''
-VFLG='var _VFLG=false;'
+VERBOSE='var _VERBOSE=false;'
 DIC='var _DIC="analysis.dictionary";'
 QUERY='var _QUERY={};'
 SENTENSE='var _SENTENSE=false;'
 CJOB="var _CJOB=false;"
 JOBS=''
-OPTIONS=`getopt -o hD:c:f:q:o:i:j:CV --long help,dictionary:,collection:,field:,query:,output:,input:,jobs:,clearjob,verbose, -- "$@"`
+OPTIONS=`getopt -o hd:s:f:q:o:i:j:CV --long help,dictionary:,source:,field:,query:,output:,input:,jobs:,clearjob,verbose, -- "$@"`
 if [ $? != 0 ] ; then
   exit 1
 fi
@@ -44,15 +44,15 @@ while true; do
     OPTARG=$2
     case $1 in
 				-h|--help)       usage 0 ;;
-				-D|--dictionary) DIC="var _DIC='${OPTARG}';";shift;;
-				-c|--collection) EVAL="${EVAL}var _COL='${OPTARG}';";shift;;
+				-d|--dictionary) DIC="var _DIC='${OPTARG}';";shift;;
+				-s|--source)     EVAL="${EVAL}var _SRC='${OPTARG}';";shift;;
 				-f|--field)      EVAL="${EVAL}var _FIELD='${OPTARG}';";shift;;
 				-q|--query)      QUERY="var _QUERY=${OPTARG};";shift;;
 				-o|--output)     EVAL="${EVAL}var _OUT='${OPTARG}';";shift;;
 				-i|--input)      SENTENSE="var _SENTENSE='`echo \"${OPTARG}\"|tr "\n" " "`';";shift;;
 				-j|--jobs)       JOBS="${OPTARG}";shift;;
 				-C|--clearjob)   CJOB="var _CJOB=true;";;
-				-V|--verbose)    VFLG="var _VFLG=true;";;
+				-V|--verbose)    VERBOSE="var _VERBOSE=true;";;
 				--) shift;break;;
 				*) echo "Internal error! " >&2; exit 1 ;;
     esac
@@ -61,13 +61,13 @@ done
 
 echo '    DOCID                  : #COMPARES'
 if [ "${JOBS}" = "" ];then
-		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js | grep -v '^loading file:'
+		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VERBOSE}${DIC}${QUERY}${SENTENSE}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js | grep -v '^loading file:'
 		exit
 fi
 WAIT=''
 EXEC=''
 for i in `eval echo "{1..${JOBS}}"`; do
-		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${VFLG}${DIC}${QUERY}${SENTENSE}${CJOB}\\" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js;` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
+		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${VERBOSE}${DIC}${QUERY}${SENTENSE}${CJOB}\\" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/parse.js;` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
 done
 eval $EXEC
 for p in $WAIT; do

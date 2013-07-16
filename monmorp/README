@@ -60,9 +60,24 @@
 　　      |- [html]           : testdata.sh用
 
 * クイックスタート
-　　０．mongo.envを編集するか環境変数を設定
+　　０．MongoDBを準備
+　　　　/usr/local/mongo以下にMongoDBを構築するか、既存のMongoDBのパスに合わせてmongo.envを編集する。
 
-　　　　　それぞれのコマンドのパスを設定する
+　　　　MongoDB構築編
+
+　　　　　　cd /tmp
+　　　　　　wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-2.4.5.tgz
+　　　　　　tar xzf mongodb-linux-x86_64-2.4.5.tgz
+　　　　　　mkdir /usr/local/mongo
+　　　　　　mv mongodb-linux-x86_64-2.4.5/bin /usr/local/mongo
+　　　　　　mkdir /usr/local/mongo/data
+　　　　　　mkdir /usr/local/mongo/logs
+
+　　　　　　mongodの起動にはサンプルコンフィグを利用しても良いでしょう。
+　　　　　　　　https://github.com/crumbjp/analysis/blob/master/sampleconf/mongod.conf　　　　
+
+　　　　　　/usr/local/mongo/bin/mongod -f <path to project>/sampleconf/mongod.conf
+
 
 　　１．IPA辞書をダウンロード
 
