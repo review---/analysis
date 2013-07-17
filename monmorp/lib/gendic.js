@@ -1,6 +1,5 @@
 var _dic_split = _DIC.split('\.');
 var _db = _pmongo.getDB(_dic_split.shift());
-
 var _DICTIONARY     = _dic_split.join('\.');
 var _DICTIONARY_TMP = _DICTIONARY+'.tmp';
 var _DICTIONARY_ORG = _DICTIONARY+'.ipadic';

@@ -9,7 +9,6 @@ Usage :
 
 Options :
     -h, --help                : This message
-    -d, --dictionary  ns      : Dictionary collection ns
     -s, --source      ns      : Target collection ns
     -v, --verbose             : 
 USAGE
@@ -18,7 +17,6 @@ USAGE
 
 EVAL=''
 
-DIC="var _DIC     = 'analysis.dictionary';"
 VERBOSE="var _VERBOSE=false;"
 
 OPTIONS=`getopt -o hs:v:t:V --long help,source:,verbose, -- "$@"`
@@ -30,7 +28,6 @@ while true; do
     OPTARG=$2
     case $1 in
 				-h|--help)       usage 0 ;;
-				-d|--dictionary) DIC="var _DIC='${OPTARG}';";shift;;
 				-s|--source)     EVAL="${EVAL}var _SRC='${OPTARG}';";shift;;
 				-V|--verbose)    VERBOSE="var _VERBOSE=true;";;
 				--) shift;break;;

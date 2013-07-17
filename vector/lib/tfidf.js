@@ -3,6 +3,8 @@ var _db = _pmongo.getDB(_src_split.shift());
 
 var SRC    = _src_split.join('\.');
 var _src   = _db.getCollection(SRC);
+var _src   = utils.getCollection(_SRC);
+
 var _IDF   = 'vector.idf.' + SRC;
 var _TFIDF = 'vector.tfidf.'+SRC;
 
@@ -14,6 +16,9 @@ var _tfidf_job = _db.getCollection(_tfidf_job_name);
 if ( _CJOB ) {
 	if ( _tfidf_job ) {
 		_tfidf_job.drop();
+	}
+	if ( _tfidf ) {
+		_tfidf.drop();
 	}
 	quit();
 }
@@ -28,16 +33,18 @@ while ( _c_idf.hasNext() ) {
 	ndim++;
 }
 
+
+var meta = _src.findOne({_id:'.meta'},{_id:0});
+meta.parse = _SRC;
 _tfidf.findAndModify({
 	query: {_id:'.meta'},
-	update:{ $setOnInsert:{ src: _SRC}},
+	update:{ $setOnInsert:meta},
 	upsert:true
 });
 
-var docids = _src.distinct(_KEY);
+var docids = _src.distinct(_KEY,{_id:{'$ne':'.meta'}});
 for ( var i in docids ){
 	var docid = docids[i];
-
 	var prev = _tfidf_job.findAndModify({
 		query: {_id:docid},
 		update:{ $setOnInsert:{ tm:ISODate()}},
@@ -64,7 +71,7 @@ for ( var i in docids ){
 		}
 		vec[w]++;
 	}
-	var len = 0;
+	var diff = 0;
 	var ndim = 0;
 	for ( var v in vec ) {
 		if ( v in idfall ) {
@@ -72,19 +79,16 @@ for ( var i in docids ){
 		}else {
 			vec[v] = 0;
 		}
-		if ( vec[v] <= _THRESHOLD ) {
+		if ( vec[v] === 0 ) {
 			delete vec[v];
 			continue;
 		}
-		len += vec[v]*vec[v];
+		diff += vec[v]*vec[v];
 		ndim++;
 	}
-	if ( _NORMALIZE ) {
-		var div = Math.sqrt(len);
-		for ( var v in vec ) {
-			vec[v] /= div;
-		}
-	}
+	var div = Math.sqrt(diff);
+	vec = utils.normalize(vec,div);
+
 	_tfidf.save({_id:id,value:vec});
 	print(docid + ' : ' + ndim);
 }

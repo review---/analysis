@@ -1,12 +1,3 @@
-var _dic_split    = _DIC.split('\.');
-var _dictionary_db_name = _dic_split.shift();
-var _dictionary_col_name = _dic_split.join('\.');
-var _dictionary  = db.getMongo().getDB(_dictionary_db_name).getCollection(_dictionary_col_name);
-
-var _src_split= _SRC.split('\.');
-var _src_db_name = _src_split.shift();
-var _src_col_name = _src_split.join('\.');
-var _src  = db.getMongo().getDB(_src_db_name).getCollection(_src_col_name);
 
 // @@@ Array.sort seems like work well...
 function sort(arr,comparator){
@@ -25,10 +16,11 @@ function sort(arr,comparator){
 	}
 	return sort(b,comparator).concat(c).concat(sort(a,comparator));
 }
-var meta = _src.findOne({_id:'.meta'});
-var _data  = db.getMongo().getDB(_src_db_name).getCollection(meta.data);
-var ORG = meta.org.split('\.');
-var _org  = db.getMongo().getDB(ORG.shift()).getCollection(ORG.join('\.'));
+var _src         = utils.getCollection(_SRC);
+var meta         = _src.findOne({_id:'.meta'});
+var _data        = utils.getCollection(meta.data);
+var _doc         = utils.getCollection(meta.doc);
+var _dictionary  = utils.getCollection(meta.dic);
 
 var _c_src = _src.find({_id:{'$ne':'.meta'}});
 while ( _c_src.hasNext() ) {
@@ -50,7 +42,7 @@ while ( _c_src.hasNext() ) {
 		while(_c_data.hasNext()){
 			var data = _c_data.next();
 			var oid = ObjectId(data._id);
-			var doc = _org.findOne({_id:oid},{_id:0})
+			var doc = _doc.findOne({_id:oid},{_id:0})
 			print(JSON.stringify(doc).slice(0,50));		
 		}
 	}

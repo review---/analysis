@@ -13,6 +13,7 @@ function canopy(_db,ns,field,def) {
 			var _src = _db.getCollection(ns);
 
 			var data_collection = _db.getCollection(data_collection_name);
+
 			var _c_src = _src.find();
 			while(_c_src.hasNext()){
 				var data = _c_src.next();
@@ -49,7 +50,6 @@ function canopy(_db,ns,field,def) {
 		}
 		var prev_cluster_collection = _db.getCollection(prev_cluster_collection_name);
 
-print(' - Read cluster - ' );
 		var cs = [];
 		var _c_prev_cluster_collection = prev_cluster_collection.find();
 		while ( _c_prev_cluster_collection.hasNext() ){
@@ -111,9 +111,7 @@ print(' - Read cluster - ' );
 					utils:utils
 				},
 				finalize: function(key,val){
-					for ( var d in val.loc ) {
-						val.loc[d] /= val.s;
-					}
+					val.loc = utils.normalize(val.loc);
 					return val;
 				}
 			});
@@ -152,12 +150,15 @@ print(' - Read cluster - ' );
 			}
 		}
 		cluster_collection.drop();
+		var num = 0;
 		for ( var c in newcs ) {
 			var cluster = newcs[c];
 			if ( cluster ) {
 				cluster_collection.save({value:cluster});
+				num++;
 			}
 		}
+		print('Num clusters : ' + num);
 		return [false,cluster_collection_name];
 	}
 
@@ -171,6 +172,7 @@ print(' - Read cluster - ' );
 		}
 	}
 		_db.getCollection(ret[1]).renameCollection(fin_cluster_collection_name);
+
 	return fin_cluster_collection_name;
 }
 
@@ -182,4 +184,14 @@ var _db = _pmongo.getDB(_src_split.shift());
 var SRC         = _src_split.join('\.');
 
 var canopy_cluster = canopy(_db,SRC,_VFIELD,{t2:_T2,t1:_T1,threshold:_THRESHOLD});
+
+var meta = _db.getCollection(SRC).findOne({_id:'.meta'},{_id:0});
+meta.vector = _SRC;
+_db.getCollection(canopy_cluster).findAndModify({
+	query: {_id:'.meta'},
+	update:{ $setOnInsert:meta},
+	upsert:true
+});
+
+
 print(canopy_cluster);

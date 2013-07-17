@@ -330,11 +330,8 @@ JPParser.prototype.parse_doc = function(docid,doc){
 	}
 }
 
-var _dic_split    = _DIC.split('\.');
-var _dictionary_db_name = _dic_split.shift();
-var _dictionary_col_name = _dic_split.join('\.');
-var _dictionary  = db.getMongo().getDB(_dictionary_db_name).getCollection(_dictionary_col_name);
-var _pdictionary = _pmongo.getDB(_dictionary_db_name).getCollection(_dictionary_col_name);
+var _dictionary  = utils.getCollection(_DIC);
+var _pdictionary = utils.getWritableCollection(_DIC);
 var _nheads = _dictionary.findOne({w:'.meta'}).nheads;
 if( ! _nheads ) {
 	print('*** Invalid dictionary : ' + _DIC);
@@ -351,17 +348,17 @@ if ( _OUT === '-' ) {
 			}
 		};
 }else{
-	var _out_split    = _OUT.split('\.');
-	var _dst_db       = _out_split.shift();
-	var _dst_name     = _out_split.join('\.');
-	var _dst_job_name = _dst_name + '.job';
-		_dst     = _pmongo.getDB(_dst_db).getCollection(_dst_name);
-		_dst_job = _pmongo.getDB(_dst_db).getCollection(_dst_job_name);
+	_dst     = utils.getWritableCollection(_OUT);
+	_dst_job = utils.getWritableCollection(_OUT + '.job');
+
 	this._dst.ensureIndex({d:1,i:1});
 }
 if ( _CJOB ) {
 	if ( _dst_job ) {
 		_dst_job.drop();
+	}
+	if ( _dst ) {
+		_dst.drop();
 	}
 	quit();
 }
@@ -375,9 +372,16 @@ if ( _SENTENSE ) {
 	quit();
 }
 
+_dst.findAndModify({
+	query: {_id:'.meta'},
+	update:{ $setOnInsert:{ 
+		doc: _SRC,
+		dic: _DIC
+	}},
+	upsert:true
+});
 
-var _src_split = _SRC.split('\.');
-var _src = db.getMongo().getDB(_src_split.shift()).getCollection(_src_split.join('\.'));
+var _src  = utils.getCollection(_SRC);
 var _c_src = _src.find(_QUERY,{_id:1});
 while ( _c_src.hasNext()){
 	var doc = _c_src.next();

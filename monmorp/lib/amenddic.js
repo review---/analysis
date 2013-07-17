@@ -1,8 +1,4 @@
-var _dictionary_name = _DIC.split('\.');
-var _db = _pmongo.getDB(_dictionary_name.shift());
-
-var _DICTIONARY     = _dictionary_name.join('\.');
-var _dictionary = _db.getCollection(_DICTIONARY);
+var _dictionary = utils.getWritableCollection(_DIC);
 
 _dictionary.update({t: ["動詞","接尾"] },{'$set': { t:["助動詞"]} } , { multi:true});
 _dictionary.update({w: "たがる" },{'$set': { t:["助動詞"]} });

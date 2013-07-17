@@ -186,39 +186,37 @@ function kmeans(_db,ns,field,locs) {
 		_db.getCollection(ret[1]).renameCollection(fin_cluster_collection_name);
 		_db.getCollection(ret[2]).renameCollection(fin_data_collection_name);
 
-		_db.getCollection(fin_cluster_collection_name).findAndModify({
-			query: {_id:'.meta'},
-			update:{ $setOnInsert:{
-				org: db.getName() + '.' + ns,
-				data:fin_data_collection_name,
-				cluster:fin_cluster_collection_name}},
-			upsert:true
-		});
-		_db.getCollection(fin_data_collection_name).findAndModify({
-			query: {_id:'.meta'},
-			update:{ $setOnInsert:{
-				org: db.getName() + '.' + ns,
-				data:fin_data_collection_name,
-				cluster:fin_cluster_collection_name}},
-			upsert:true
-		});
-
-
 	return [fin_cluster_collection_name,fin_data_collection_name];
 }
 
-
-
 print('== KMEANS ==');
 var _src_split  = _SRC.split('\.');
-var _db         = _pmongo.getDB(_src_split.shift());
+var _DB         = _src_split.shift();
+var _db         = _pmongo.getDB(_DB);
 var SRC         = _src_split.join('\.');
 
-var _cluster_split  = _CLUSTER.split('\.');
-var _c_cluster = db.getMongo().getDB(_cluster_split.shift()).getCollection(_cluster_split.join('\.')).find();
+var _c_cluster = utils.getCollection(_CLUSTER).find({_id:{'$ne':'.meta'}});
 var clusters = [];
 while (_c_cluster.hasNext()){
 	clusters.push(utils.getField(_c_cluster.next(),_CFIELD));
 }
 var kmeans_cluster = kmeans(_db,SRC,_VFIELD,clusters);
+
+var meta = _db.getCollection(SRC).findOne({_id:'.meta'},{_id:0});
+meta.vector = _SRC;
+meta.data   = _DB + '.' + kmeans_cluster[1];
+meta.cluster= _DB + '.' + kmeans_cluster[0];
+
+_db.getCollection(kmeans_cluster[0]).findAndModify({
+	query: {_id:'.meta'},
+	update:{ $setOnInsert:meta},
+	upsert:true
+});
+_db.getCollection(kmeans_cluster[1]).findAndModify({
+	query: {_id:'.meta'},
+	update:{ $setOnInsert:meta},
+	upsert:true
+});
+
+
 print(kmeans_cluster);
