@@ -8,7 +8,8 @@ var morpho = {
 	forms   : function(nheads,val){
 		function gen(val,n,arr1,arr2,arr3){
 			var base = val.w.substring(0,val.w.length-n);
-			val.h = utils.heads(val.w,nheads)
+			//val.h = utils.heads(val.w,nheads)
+			val.h = [val.w.slice(0,nheads)];
 			val.w = [val.w];
 			// default
 			if ( ! val.f[val.w] ) {
@@ -21,7 +22,8 @@ var morpho = {
 			// endable
 			for ( var i in arr1 ) {
 				var w = base + arr1[i];
-				val.h.concat(utils.heads(w,nheads))
+				//val.h = val.h.concat(utils.heads(w,nheads))
+				val.h.push(w.slice(0,nheads));
 				val.w.push(w);
 				if ( ! val.f[w] ) {
 					val.f[w] = [];
@@ -32,7 +34,8 @@ var morpho = {
 			// follow ppp
 			for ( var i in arr2 ) {
 				var w = base + arr2[i];
-				val.h.concat(utils.heads(w,nheads))
+				//val.h = val.h.concat(utils.heads(w,nheads))
+				val.h.push(w.slice(0,nheads));
 				val.w.push(w);
 				if ( ! val.f[w] ) {
 					val.f[w] = [];
@@ -43,7 +46,8 @@ var morpho = {
 			// follow verb
 			for ( var i in arr3 ) {
 				var w = base + arr3[i];
-				val.h.concat(utils.heads(w,nheads))
+				//val.h = val.h.concat(utils.heads(w,nheads))
+				val.h.push(w.slice(0,nheads));
 				val.w.push(w);
 				if ( ! val.f[w] ) {
 					val.f[w] = [];
@@ -58,8 +62,8 @@ var morpho = {
 			delete val.p;
 			return val;
 		}
+		var len = val.w.length;
 		if ( utils.array_in(val.t,"動詞") ) {
-			var len = val.w.length;
 			if        (  val.w === "ける" ) {
 			}	else if ( val.w === "げる" ) {
 			}	else if ( val.w === "たす" ) {
@@ -122,8 +126,9 @@ var morpho = {
 				return gen(val,1,[],["かろ","かっ","けれ"],["く"]);
 			}
 		}
-		val.h = utils.heads(val.w,nheads);
-		val.h = (val.h.length===1?val.h[0]:val.h);
+		//val.h = utils.heads(val.w,nheads);
+		val.h = val.w.slice(0,nheads);
+		//val.h = (val.h.length===1?val.h[0]:val.h);
 		delete val.p;
 		return val;
 	}

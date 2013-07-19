@@ -1,3 +1,5 @@
+var dictionary = new Dictionary(_DIC);
+
 var _dic_split = _DIC.split('\.');
 var _db = _pmongo.getDB(_dic_split.shift());
 var _DICTIONARY     = _dic_split.join('\.');
@@ -23,6 +25,7 @@ var TYPELIST = {
 		"助動詞"  :1500,
 		"不明"    :9999
 }
+
 _db.getCollection(_DICTIONARY_ORG).mapReduce (
   			function(){
   				emit(this.w,{
@@ -82,18 +85,15 @@ _db.getCollection(_DICTIONARY_ORG).mapReduce (
 print('=== IMPORT BUILT DICTIONARY ===');
 
 var _dictionary_tmp = _db.getCollection(_DICTIONARY_TMP);
-var _dictionary = _db.getCollection(_DICTIONARY);
-_dictionary.drop();
 
-_dictionary.save({w:'.meta',nheads:_NHEADS});
+dictionary.init(_NHEADS);
+
 var elems= _dictionary_tmp.find();
 while (elems.hasNext()){
 	var elem = elems.next();
-	_dictionary.save(elem.value);
+	dictionary.save(elem.value);
 }
+// To reduce index size.
+dictionary.index();
+
 _dictionary_tmp.drop();
-
-
-_dictionary.ensureIndex({w:1});
-_dictionary.ensureIndex({h:1,l:-1,s:1});
-_dictionary.ensureIndex({t:1});
