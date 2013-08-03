@@ -17,15 +17,12 @@ var fs = require('fs');
 var path = require('path');
 var url = require('url');
 //var querystring = require('querystring');
-var http    = require('http');
-var https   = require('https');
 var jsdom   = require('jsdom').jsdom;
 
 //----------------------------------------------
 // Definitions
 //----------------------------------------------
 var MEM_THRESHOLD = 300*1024*1024; // byte
-//var MEM_THRESHOLD = 10*1024*1024; // byte
 
 //---------------
 // Environments
@@ -125,7 +122,14 @@ function gettext(id,body){
 			$('script').text('');
 			$('style').text('');
 			var text ='';
-				$('#content').text().split("\n").forEach(function(l){
+				$('#topicsDetailCmp').text().split("\n").forEach(function(l){
+					var line = l.replace(/^\s+/,'').replace(/\s+/m,' ');
+					if ( line && line != ' ' ) {
+						// text += line.split('"').join('\\"')  + '\\n';
+						text += line;
+					}
+				});
+				$('#articleDetailCmp').text().split("\n").forEach(function(l){
 					var line = l.replace(/^\s+/,'').replace(/\s+/m,' ');
 					if ( line && line != ' ' ) {
 						// text += line.split('"').join('\\"')  + '\\n';

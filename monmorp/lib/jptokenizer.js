@@ -157,7 +157,8 @@ JPTokenizer.prototype.search_follows = function(candidate,sentence){
 JPTokenizer.prototype.parse_original = function(sentence,word,type,query){
 	var candidate = this.dictionary.findOne({w:word});
 	if ( ! candidate ) {
-		candidate = morpho.forms(this.nheads,{w:word,l:word.length,c:0,s:300,t:["名詞","ORG",type],h:word[0]});
+		//candidate = morpho.forms(this.nheads,{w:word,l:word.length,c:0,s:300,t:["名詞","ORG",type],h:word[0]});
+		candidate = morpho.forms(this.nheads,{w:word,l:word.length,c:0,s:300,t:["名詞","ORG",type]});
 		candidate = this.dictionary.upsert(candidate);
 	}
 	return this.search_follows(candidate,sentence.substring(word.length));

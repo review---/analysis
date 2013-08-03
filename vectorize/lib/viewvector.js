@@ -1,9 +1,9 @@
 var _src         = utils.getCollection(_SRC);
-var meta         = _src.findOne({_id:'.meta'});
+var meta         = utils.getmeta(_src);
 var _doc         = utils.getCollection(meta.doc);
 var _dictionary  = utils.getCollection(meta.dic);
 
-var _c_src = _src.find({_id:{'$ne':'.meta'}});
+var _c_src = _src.find(utils.IGNORE_META);
 while ( _c_src.hasNext() ) {
 	var vector = _c_src.next();
 	print('====== ' + vector._id + ' ) ======');

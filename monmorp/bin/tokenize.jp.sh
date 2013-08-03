@@ -34,6 +34,7 @@ DIC="var _DIC='analysis.dictionary';"
 QUERY='var _QUERY={};'
 SENTENSE='var _SENTENSE=false;'
 CJOB="var _CJOB=false;"
+CLEAR=
 JOBS=''
 OPTIONS=`getopt -o hd:s:f:q:o:i:j:CV --long help,dictionary:,source:,field:,query:,output:,input:,jobs:,clearjob,verbose, -- "$@"`
 if [ $? != 0 ] ; then
@@ -51,13 +52,18 @@ while true; do
 				-o|--output)     EVAL="${EVAL}var _OUT='${OPTARG}';";shift;;
 				-i|--input)      SENTENSE="var _SENTENSE='`echo \"${OPTARG}\"|tr "\n" " "`';";shift;;
 				-j|--jobs)       JOBS="${OPTARG}";shift;;
-				-C|--clearjob)   CJOB="var _CJOB=true;";;
+				-C|--clearjob)   CLEAR="1";;
 				-V|--verbose)    VERBOSE="var _VERBOSE=true;";;
 				--) shift;break;;
 				*) echo "Internal error! " >&2; exit 1 ;;
     esac
 		shift
 done
+
+if [ "${CLEAR}" = "1" ];then
+		CJOB="var _CJOB=true;"
+		JOBS=''
+fi
 
 echo '    DOCID                  : #COMPARES'
 if [ "${JOBS}" = "" ];then

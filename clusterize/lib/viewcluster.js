@@ -1,5 +1,5 @@
 var _src         = utils.getCollection(_SRC);
-var meta         = _src.findOne({_id:'.meta'});
+var meta         = utils.getmeta(_src);
 var _data        = utils.getCollection(meta.data);
 
 var _c_src = _src.find({_id:{'$ne':'.meta'}});
@@ -35,7 +35,7 @@ while ( _c_src.hasNext() ) {
 			var data = _c_data.next();
 			var oid = ObjectId(data._id);
 			var doc = _doc.findOne({_id:oid},{_id:0})
-			print(JSON.stringify(doc).slice(0,50));		
+			print(JSON.stringify(doc).slice(0,90));		
 		}
 	}
 }

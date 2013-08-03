@@ -1,5 +1,5 @@
 var _src         = utils.getCollection(_SRC);
-var meta         = _src.findOne({_id:'.meta'});
+var meta         = utils.getmeta(_src);
 var dictionary   = new Dictionary(meta.dic);
 
 var ts = []
@@ -93,4 +93,3 @@ if ( _VERBOSE ) {
 		printjson(doc);
 	}
 }
-

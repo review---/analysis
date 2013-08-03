@@ -1,5 +1,5 @@
 var _src         = utils.getCollection(_SRC);
-var meta         = _src.findOne({_id:'.meta'});
+var meta         = utils.getmeta(_src);
 
 var docs = {};
 var _c_src = _src.find(_QUERY);
@@ -50,7 +50,7 @@ if ( _VERBOSE ) {
 	var _c_doc = _doc.find(query);
 	while ( _c_doc.hasNext() ) {
 		var doc = _c_doc.next();
-		printjson(doc);
+		print(JSON.stringify(doc).slice(0,_VERBOSE_LEN));		
 	}
 }
 

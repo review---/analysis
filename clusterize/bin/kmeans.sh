@@ -26,6 +26,7 @@ VFIELD="var _VFIELD = 'value';";
 CFIELD="var _CFIELD  = 'value.loc';"
 
 CJOB="var _CJOB=false;"
+CLEAR=
 JOBS=''
 
 
@@ -43,13 +44,17 @@ while true; do
 				-i|--initial-cluster)  EVAL="${EVAL}var _CLUSTER='${OPTARG}';";shift;;
 				-c|--cluster-field)    CFIELD="var _CFIELD='${OPTARG}';";shift;;
 				-j|--jobs)       JOBS="${OPTARG}";shift;;
-				-C|--clearjob)   CJOB="var _CJOB=true;";;
+				-C|--clearjob)   CLEAR="1";;
 				--) shift;break;;
 				*) echo "Internal error! " >&2; exit 1 ;;
     esac
 		shift
 done
 
+if [ "${CLEAR}" = "1" ];then
+		CJOB="var _CJOB=true;"
+		JOBS=''
+fi
 
 if [ "${JOBS}" = "" ];then
 		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VFIELD}${CFIELD}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/kmeans.js.bk | grep -v '^loading file:'

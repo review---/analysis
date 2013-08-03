@@ -24,6 +24,7 @@ QUERY='var _QUERY={};'
 KEY="var _KEY='d';"
 WORD="var _WORD='c';"
 CJOB="var _CJOB=false;"
+CLEAR=
 JOBS=''
 
 OPTIONS=`getopt -o hs:k:w:q:j:C --long help,source:,key-field:,word-field:,query:,jobs:,clearjob, -- "$@"`
@@ -40,12 +41,17 @@ while true; do
 				-w|--word-field) WORD="var _WORD=${OPTARG};";shift;;
 				-q|--query)      QUERY="var _QUERY=${OPTARG};";shift;;
 				-j|--jobs)       JOBS="${OPTARG}";shift;;
-				-C|--clearjob)   CJOB="var _CJOB=true;";;
+				-C|--clearjob)   CLEAR="1";;
 				--) shift;break;;
-				*) echo "Internal error! " >&2; exit 1 ;;
+				# *) echo "Internal error! " >&2; exit 1 ;;
     esac
 		shift
 done
+
+if [ "${CLEAR}" = "1" ];then
+		CJOB="var _CJOB=true;"
+		JOBS=''
+fi
 
 if [ "${JOBS}" = "" ];then
 		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${KEY}${WORD}${QUERY}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/vectorize.js ${CURDIR}/../lib/tf.js | grep -v '^loading file:'

@@ -12,7 +12,7 @@ Options :
     -s, --source      ns      : Target collection ns
     -w, --word        string  : Search word
     -F, --forward-match       : Left-hand match
-    -v, --verbose             : 
+    -V, --verbose             : With document
 USAGE
   exit $1
 }

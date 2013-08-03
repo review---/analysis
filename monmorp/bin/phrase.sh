@@ -5,7 +5,7 @@ source $CURDIR/../../mongo.env
 usage (){
 cat<<USAGE
 Usage :
-  df.sh [options]
+  phrase.sh [options]
 
 Options :
     -h, --help                : This message
@@ -20,14 +20,13 @@ USAGE
 
 
 EVAL=''
-QUERY='var _QUERY={};'
 KEY="var _KEY='d';"
 WORD="var _WORD='c';"
 CJOB="var _CJOB=false;"
 CLEAR=
 JOBS=''
 
-OPTIONS=`getopt -o hs:k:w:q:j:C --long help,source:,key-field:,word-field:,query:,jobs:,clearjob, -- "$@"`
+OPTIONS=`getopt -o hs:k:w:j:C --long help,source:,key-field:,word-field:,jobs:,clearjob, -- "$@"`
 if [ $? != 0 ] ; then
   exit 1
 fi
@@ -39,7 +38,6 @@ while true; do
 				-s|--source)     EVAL="${EVAL}var _SRC='${OPTARG}';";shift;;
 				-k|--key-field)  KEY="var _KEY=${OPTARG};";shift;;
 				-w|--word-field) WORD="var _WORD=${OPTARG};";shift;;
-				-q|--query)      QUERY="var _QUERY=${OPTARG};";shift;;
 				-j|--jobs)       JOBS="${OPTARG}";shift;;
 				-C|--clearjob)   CLEAR="1";;
 				--) shift;break;;
@@ -54,13 +52,13 @@ if [ "${CLEAR}" = "1" ];then
 fi
 
 if [ "${JOBS}" = "" ];then
-		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${KEY}${WORD}${QUERY}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/vectorize.js ${CURDIR}/../lib/df.js | grep -v '^loading file:'
+		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${KEY}${WORD}${QUERY}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/dictionary.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/phrase.js | grep -v '^loading file:'
 		exit
 fi
 WAIT=''
 EXEC=''
 for i in `eval echo "{1..${JOBS}}"`; do
-		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${KEY}${WORD}${QUERY}${CJOB}\\" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/vectorize.js ${CURDIR}/../lib/df.js` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
+		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${KEY}${WORD}${QUERY}${CJOB}\\" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/dictionary.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/phrase.js` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
 done
 eval $EXEC
 for p in $WAIT; do

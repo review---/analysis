@@ -200,21 +200,15 @@ var _src_split  = _SRC.split('\.');
 var _db = _pmongo.getDB(_src_split.shift());
 var SRC         = _src_split.join('\.');
 
-var meta = _db.getCollection(SRC).findOne({_id:'.meta'},{_id:0});
-if ( ! meta ){
-	meta = {};
-}
+var meta=	utils.getmeta(_db.getCollection(SRC));
+meta.vector = _SRC;
 if ( meta.normalize ) {
 		_NORMALIZE = true;
 }
 
 var canopy_cluster = canopy(_db,SRC,{t2:_T2,t1:_T1,threshold:_THRESHOLD});
 
-meta.vector = _SRC;
-_db.getCollection(canopy_cluster).findAndModify({
-	query: {_id:'.meta'},
-	update:{ $setOnInsert:meta},
-	upsert:true
-});
+utils.setmeta(_db.getCollection(canopy_cluster),meta);
+
 print(canopy_cluster);
 printjson(meta);

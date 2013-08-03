@@ -1,5 +1,6 @@
 var dictionary = new Dictionary(_DIC);
 
+var _src  = utils.getCollection(_SRC);
 var _dst;
 var _dst_job;
 if ( _OUT === '-' ) {
@@ -20,15 +21,13 @@ if ( _OUT === '-' ) {
 	_dst_job = utils.getWritableCollection(_OUT + '.job');
 
 	this._dst.ensureIndex({d:1,i:1});
+	this._dst.ensureIndex({i:1});
 	this._dst.ensureIndex({w:1});
 }
 if ( _CJOB ) {
-	if ( _dst_job ) {
-		_dst_job.drop();
-	}
-	if ( _dst ) {
+	var _c_src = _src.find(utils.IGNORE_META,{_id:1});
+	utils.reset_job(_c_src,_dst_job);
 		_dst.drop();
-	}
 	quit();
 }
 
@@ -41,28 +40,18 @@ if ( _SENTENSE ) {
 	quit();
 }
 
-_dst.findAndModify({
-	query: {_id:'.meta'},
-	update:{ $setOnInsert:{ 
-		doc: _SRC,
-		dic: _DIC
-	}},
-	upsert:true
-});
+var meta = { 
+	doc: _SRC,
+	dic: _DIC
+};
+utils.setmeta(_dst,meta);
 
-var _src  = utils.getCollection(_SRC);
-var _c_src = _src.find(_QUERY,{_id:1});
-while ( _c_src.hasNext()){
-	var doc = _c_src.next();
-
-	var prev = _dst_job.findAndModify({
-		query: {_id:doc._id},
-		update:{ $setOnInsert:{ tm:ISODate()}},
-		upsert:true
-	});
-	if ( prev ) {
-		continue;
+while ( true ) {
+	var job = utils.get_job(_dst_job);
+	if ( ! job ) {
+		break;
 	}
+	var doc = _src.findOne({_id:job._id});
 		_dst.remove({docid:doc._id});
 	var doc = _src.findOne({_id:doc._id});
 	tokenizer.parse_doc(doc._id,utils.getField(doc,_FIELD));

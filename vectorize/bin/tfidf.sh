@@ -12,8 +12,6 @@ Options :
     -s, --source      ns      : Target collection ns
     -k, --key-filed   name    : Key field      (default : 'd')
     -w, --word-field  name    : Word field     (default : 'c')
-    -t, --threshold   float   : IDF threashold minimum proportion (defalut : 0.1)
-    -l, --limit       float   : IDF threashold maximum proportion (defalut : 0.75)
     -j, --jobs        num     : Number of jobs
     -C, --clearjob            : Clear job control info. (Kick once before start parse)
 USAGE
@@ -25,12 +23,11 @@ EVAL=''
 QUERY='var _QUERY={};'
 KEY="var _KEY='d';"
 WORD="var _WORD='c';"
-THREASHOLD="var _THRESHOLD=0.1;"
-LIMIT="var _LIMIT=0.75;"
 CJOB="var _CJOB=false;"
+CLEAR=
 JOBS=''
 
-OPTIONS=`getopt -o hs:k:w:q:t:l:j:C --long help,source:,key-field:,word-field:,query:,threshold:,limit:,jobs:,clearjob, -- "$@"`
+OPTIONS=`getopt -o hs:k:w:q:j:C --long help,source:,key-field:,word-field:,query:,jobs:,clearjob, -- "$@"`
 if [ $? != 0 ] ; then
   exit 1
 fi
@@ -43,24 +40,27 @@ while true; do
 				-k|--key-field)  KEY="var _KEY=${OPTARG};";shift;;
 				-w|--word-field) WORD="var _WORD=${OPTARG};";shift;;
 				-q|--query)      QUERY="var _QUERY=${OPTARG};";shift;;
-				-t|--threshold)  THRESHOLD="var _THRESHOLD=${OPTARG};";shift;;
-				-l|--limit)      LIMIT="var _LIMIT=${OPTARG};";shift;;
 				-j|--jobs)       JOBS="${OPTARG}";shift;;
-				-C|--clearjob)   CJOB="var _CJOB=true;";;
+				-C|--clearjob)   CLEAR="1";;
 				--) shift;break;;
-				*) echo "Internal error! " >&2; exit 1 ;;
+				# *) echo "Internal error! " >&2; exit 1 ;;
     esac
 		shift
 done
 
+if [ "${CLEAR}" = "1" ];then
+		CJOB="var _CJOB=true;"
+		JOBS=''
+fi
+
 if [ "${JOBS}" = "" ];then
-		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${KEY}${WORD}${QUERY}${THREASHOLD}${LIMIT}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/vectorize.js ${CURDIR}/../lib/tfidf.js | grep -v '^loading file:'
+		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${KEY}${WORD}${QUERY}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/vectorize.js ${CURDIR}/../lib/tfidf.js | grep -v '^loading file:'
 		exit
 fi
 WAIT=''
 EXEC=''
 for i in `eval echo "{1..${JOBS}}"`; do
-		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${KEY}${WORD}${QUERY}${THREASHOLD}${LIMIT}${CJOB}\\" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/vectorize.js ${CURDIR}/../lib/tfidf.js` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
+		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${KEY}${WORD}${QUERY}${CJOB}\\" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/vectorize.js ${CURDIR}/../lib/tfidf.js` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
 done
 eval $EXEC
 for p in $WAIT; do
