@@ -6,11 +6,12 @@ var sync = require('synchronize');
 //---------------------------------
 // constructor 
 //---------------------------------
-function FetchLogger(node,dbname,colname) {
+function FetchLogger(node,colname) {
 	var node_split = node.split(':');
 	this.host = node_split[0];
-	this.port = node_split[1];
-	this.dbname = dbname;
+	var node_split_split = node_split[1].split('/');
+	this.port = node_split_split[0];
+	this.dbname = node_split_split[1];
 	this.colname = colname;
 }
 

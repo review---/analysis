@@ -397,6 +397,7 @@ function do_worker(){
 				log.error('=======================','LOOP','catch',e.stack);
 			}
 		}
+		var loopInterval = null;
 		var termTimeout = null;
 		function loop (){
 			sync.fiber(function(){
@@ -417,6 +418,10 @@ function do_worker(){
 							exit();
 						},SETTING.TIMEOUT);
 					}
+					if ( loopInterval ){
+						clearInterval(loopInterval);
+						loopInterval = null;
+					}
 					return;
 				}
 				if ( ! F.target_count() ) {
@@ -434,9 +439,8 @@ function do_worker(){
 				log.error('=======================','LOOP','catch',e.stack);
 			}
 			});
-			setTimeout(loop,SETTING.WAIT); // Busy ! See you next.. 
 		}
-		loop();
+		loopInterval = setInterval(loop,SETTING.WAIT);
 	}catch ( e ) {
 		log.error(SETTING.URL,'LOOP','catch',e.stack);
 		return;
@@ -573,7 +577,7 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 
 
   function http_fetch(request){
-    var TO = setTimeout(function () {
+    var TO=setTimeout(function () {
 			sync.fiber(function(){
 				if ( request ) {
 					request.abort();

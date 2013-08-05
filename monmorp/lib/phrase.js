@@ -126,8 +126,9 @@ function analyize_phrase(){
 	utils.waitfor_job(_job);
 }
 
-function c_value(){
+function c_value(field){
 	function subs(sw,tmp){
+		var tf = tmp[field];
 		var n = sw.length;
 		if ( n > 2 ) {
 			var heads = sw.slice(0,n-1);
@@ -136,7 +137,7 @@ function c_value(){
 										{ 
 												$inc : {
 													c : 1,
-													t : tmp.tf
+													t : tf
 												}
 										}
 										);
@@ -146,7 +147,7 @@ function c_value(){
 										{ 
 												$inc : {
 													c : 1,
-													t : tmp.tf
+													t : tf
 												}
 										}
 										);
@@ -160,10 +161,15 @@ function c_value(){
 		var _c_tmp = _tmp.find({n:i, df:{ $gte: threshold } });
 		while ( _c_tmp.hasNext()){
 			var tmp = _c_tmp.next();
-			// c-value
-			tmp.cv = (tmp.n - 1) * tmp.tf;
+			// Tuned C-VALUE
+			var tf = tmp[field];
+			tmp.cv = tf;
+			// tmp.cv = Math.log(tmp.n - 1) * tf;
+			// tmp.cv = (tmp.n - 1) * tf;
 			if ( tmp.c ) {
-				tmp.cv = (tmp.n - 1) * ( tmp.tf - tmp.t / tmp.c);
+				tmp.cv = ( tf - tmp.t / tmp.c);
+				// tmp.cv = Math.log(tmp.n - 1) * ( tf - tmp.t / tmp.c);
+				// tmp.cv = (tmp.n - 1) * ( tf - tmp.t / tmp.c);
 			}
 				_tmp.save(tmp);
 			subs(tmp.sw,tmp);
@@ -176,7 +182,10 @@ function eval_df(){
 	print('== DO ( '+ndocs+' => '+Math.log(ndocs)+' ) ==');
 	
 
-	c_value();
+	var start = new Date();
+	c_value('df');
+	var end = new Date();
+	print('== END ==' + (end-start) );
 //	var _c_tmp = _tmp.find({df:{ $gte: threshold } }).sort({df:-1})
 //	while ( _c_tmp.hasNext()){
 //		var tmp = _c_tmp.next();
@@ -195,9 +204,6 @@ function eval_df(){
 //		db.tmp2.save(candidate);
 //	}
 
-//	var start = new Date();
-//	var end = new Date();
-//	print('== END ==' + (end-start) );
 }
 
 analyize_phrase();
