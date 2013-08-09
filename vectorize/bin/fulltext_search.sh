@@ -11,7 +11,6 @@ Options :
     -h, --help                : This message
     -s, --source      ns      : Target collection ns
     -w, --word        string  : Search word
-    -F, --forward-match       : Left-hand match
     -V, --verbose             : With document
 USAGE
   exit $1
@@ -20,8 +19,9 @@ USAGE
 EVAL=''
 FOWARD=''
 VERBOSE="var _VERBOSE=false;"
+VERBOSE_LEN="var _VERBOSE_LEN=80;"
 
-OPTIONS=`getopt -o hs:v:w:FV --long help,source:,word:,forward-match,verbose, -- "$@"`
+OPTIONS=`getopt -o hs:v:w:L:V --long help,source:,word:,forward-match,verbose, -- "$@"`
 if [ $? != 0 ] ; then
   exit 1
 fi
@@ -32,14 +32,14 @@ while true; do
 				-h|--help)       usage 0 ;;
 				-s|--source)     EVAL="${EVAL}var _SRC='${OPTARG}';";shift;;
 				-w|--word)       EVAL="${EVAL}var _WORD='${OPTARG}';";shift;;
-				-F|--forward-match) FORWARD=1;;
 				-V|--verbose)    VERBOSE="var _VERBOSE=true;";;
+				-L|--verbose-length)  VERBOSE_LEN="var _VERBOSE_LEN=${OPTARG};";shift;;
 				--) shift;break;;
 				*) echo "Internal error! " >&2; exit 1 ;;
     esac
 		shift
 done
 
-${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VERBOSE}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../../monmorp/lib/dictionary.js ${CURDIR}/../../monmorp/lib/morpho.js ${CURDIR}/../../monmorp/lib/jptokenizer.js ${CURDIR}/../lib/search.js | grep -v '^loading file:'
+${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VERBOSE}${VERBOSE_LEN}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../../monmorp/lib/dictionary.js ${CURDIR}/../../monmorp/lib/morpho.js ${CURDIR}/../../monmorp/lib/jptokenizer.js ${CURDIR}/../lib/search.js | grep -v '^loading file:'
 
 

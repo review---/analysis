@@ -1,0 +1,17 @@
+* About VECTORIZE
+
+　　形態素解析結果からドキュメントの特徴を表すベクトルを算出する
+
+* クイックスタート
+
+　　超簡略化手順（仮）：
+
+　　１．ベクトル算出
+
+　　　./bin/vectorize.sh -s test.token.sampledoc -j 4
+
+　　２．文書検索
+
+　　　./bin/fulltext_search.sh -s test.vector.tf.token.sampledoc -w '月探査' -V 
+　　
+
