@@ -8,8 +8,11 @@ var _src   = utils.getCollection(_SRC);
 var meta   = utils.getmeta(_src);
 var TMP = _DB + '.phrse.' + SRC;
 var _tmp = utils.getWritableCollection(TMP);
-var _job = utils.getWritableCollection(TMP+'.job');
+var _job = utils.getWritableCollection(TMP+'.job1');
 var dic = new Dictionary(meta.dic);
+
+var ndocs = _job.stats().count;
+var threshold = Math.log(ndocs) * _THRESHOLD;
 
 if ( _CJOB ) {
 	var _c_src = _src.find({i:1},{_id:0,d:1});
@@ -17,6 +20,7 @@ if ( _CJOB ) {
 	_tmp.drop();
 	_tmp.ensureIndex({n:1,df:1});
 	_tmp.ensureIndex({cv:1});
+	_tmp.ensureIndex({st:1});
 	//_tmp.ensureIndex({tf:1});
 	quit();
 }
@@ -84,11 +88,12 @@ PhraseAnalysis.prototype.do_process = function(t){
 									 {_id:ret.w},
 									 { 
 											 $setOnInsert: {
+												 st : 2,
 												 n : ret.n,
 												 sw : ret.sw,
 												 t : 0,
 												 c : 0,
-												 cv : 0
+												 cv : -1
 											 },
 											 $inc        : {df:1,tf:1} },
 									 { upsert:true }
@@ -122,8 +127,8 @@ function analyize_phrase(){
 		utils.end_job(_job,job._id);
 		print ( job._id.toString() + ' : ' );
 	}
-	print('== wait ==');
-	utils.waitfor_job(_job);
+	print('== Wait for analyize_phrase() ==');
+	utils.waitfor_jobs(_job);
 }
 
 function c_value(field){
@@ -133,7 +138,7 @@ function c_value(field){
 		if ( n > 2 ) {
 			var heads = sw.slice(0,n-1);
 				_tmp.update(
-										{_id:heads.join('')},
+										{_id:heads.join('') },
 										{ 
 												$inc : {
 													c : 1,
@@ -143,7 +148,7 @@ function c_value(field){
 										);
 			var tails = sw.slice(1,n)
 				_tmp.update(
-										{_id:tails.join('')},
+										{_id:tails.join('') },
 										{ 
 												$inc : {
 													c : 1,
@@ -155,30 +160,30 @@ function c_value(field){
 			subs(tails,tmp);
 		}
 	}
-	var ndocs = _job.stats().count;
-	var threshold = Math.log(ndocs) * _THRESHOLD;
 	for ( var i = _NGRAM; i >= 2; i-- ) {
-		var _c_tmp = _tmp.find({n:i, df:{ $gte: threshold } });
+		var _c_tmp = _tmp.find({n:i , df:{ $gte: threshold }});
 		while ( _c_tmp.hasNext()){
 			var tmp = _c_tmp.next();
 			// Tuned C-VALUE
 			var tf = tmp[field];
-			tmp.cv = tf;
+			tmp.cv = tf / ndocs;
 			// tmp.cv = Math.log(tmp.n - 1) * tf;
 			// tmp.cv = (tmp.n - 1) * tf;
 			if ( tmp.c ) {
-				tmp.cv = ( tf - tmp.t / tmp.c);
+				tmp.cv = ( tf - tmp.t / tmp.c) / ndocs;
 				// tmp.cv = Math.log(tmp.n - 1) * ( tf - tmp.t / tmp.c);
 				// tmp.cv = (tmp.n - 1) * ( tf - tmp.t / tmp.c);
 			}
-				_tmp.save(tmp);
+				_tmp.update(
+										{_id:tmp._id},
+										{$set : { cv : tmp.cv } }
+										);
 			subs(tmp.sw,tmp);
 		}
 	}
 }
 
 function eval_df(){
-	var ndocs = _job.stats().count;
 	print('== DO ( '+ndocs+' => '+Math.log(ndocs)+' ) ==');
 	
 
@@ -186,27 +191,15 @@ function eval_df(){
 	c_value('df');
 	var end = new Date();
 	print('== END ==' + (end-start) );
-//	var _c_tmp = _tmp.find({df:{ $gte: threshold } }).sort({df:-1})
-//	while ( _c_tmp.hasNext()){
-//		var tmp = _c_tmp.next();
-//		var _c_p = _tmp.find({
-//				_id: { $regex: tmp._id},
-//			n    : { $gt   : tmp.n}
-//		}).sort({df:-1}).limit(1);
-//		if ( _c_p.count() > 0 ) {
-//			var p = _c_p.next();
-//			if ( tmp.df - p.df <= threshold ){
-//				print(tmp._id + ' ( ' + tmp.df + ' )  : ' + p._id+ ' ( ' + p.df + ' ) = ' + (tmp.df - p.df));
-//			}
-//			continue;
-//		}
 //		var candidate = morpho.forms(dic.nheads(),{w:tmp._id,l:tmp._id.length,c:0,s:300,t:["名詞","ORG","PHRASE"]});
 //		db.tmp2.save(candidate);
 //	}
-
 }
 
+
+
 analyize_phrase();
+
 var semaphore = _job.findAndModify({
 	query: utils.META,
 	update:{ $setOnInsert:{st:1}},
@@ -218,3 +211,103 @@ print('== QUIT ==');
 }
 _job.update(utils.META,{$set:{st:2}});
 eval_df();
+
+
+
+
+
+
+//function c_value_map(mapjob,field){
+//	function subs(sw,tmp){
+//		var tf = tmp[field];
+//		var n = sw.length;
+//		if ( n > 2 ) {
+//			var heads = sw.slice(0,n-1);
+//				_tmp.update(
+//										{_id:heads.join('') },
+//										{ 
+//												$inc : {
+//													c : 1,
+//													t : tf
+//												}
+//										}
+//										);
+//			var tails = sw.slice(1,n)
+//				_tmp.update(
+//										{_id:tails.join('') },
+//										{ 
+//												$inc : {
+//													c : 1,
+//													t : tf
+//												}
+//										}
+//										);
+//			subs(heads,tmp);
+//			subs(tails,tmp);
+//		}
+//	}
+//	print('== C-VALUE MAP ==');
+//	while(true){
+//		var job = utils.get_job(mapjob);
+//		if ( ! job ) {
+//			break;
+//		}
+//		var tmp = _tmp.findOne({_id:job._id});
+//		subs(tmp.sw,tmp);
+//		utils.end_job(mapjob,job._id);
+//	}
+//	print('== Wait for c_value_map() ==');
+//	utils.waitfor_jobs(_tmp);
+//}
+//function c_value_reduce(field){
+//	print('== C-VALUE REDUCE ==');
+//	while(true){
+//		var job = utils.get_job(_tmp);
+//		if ( ! job ) {
+//			break;
+//		}
+//		// For performance
+//		var tmp = job;
+//		var tf = tmp[field];
+//		tmp.cv = tf / ndocs;
+//		if ( tmp.c ) {
+//			tmp.cv = ( tf - tmp.t / tmp.c) / ndocs;
+//		}
+//			_tmp.update(
+//									{_id:tmp._id},
+//									{$set : { cv : tmp.cv , st:2 } }
+//									);
+//		//utils.end_job(_tmp,job._id);
+//	}
+//}
+//
+//
+//var start = new Date();
+//
+//if ( utils.sync_job(_job,1) ) {
+//	print('== CREATE C-VALUE JOB ==');
+//	var _c_tmp = _tmp.find({
+//		n: { $gt : 2} , 
+//		df:{ $gte: threshold }
+//	});
+//	utils.reset_job(_c_tmp,_job2);
+//	utils.end_job(_job,1);
+//}
+//c_value_map(_job2,'df');
+//if ( utils.sync_job(_job,2) ) {
+//	print('== CREATE C-VALUE REDUCE ==');
+//	_tmp.update(
+//							{
+//								n: { $gte : 2} , 
+//								df:{ $gte: threshold }
+//							},
+//							{ $set : {st:0} },
+//							{ multi: true });
+//printjson(_tmp.find({st:0}).count());
+//	utils.end_job(_job,2);
+//}
+//c_value_reduce('df');
+//
+//var end = new Date();
+//
+//print('== END ==' + (end-start) );

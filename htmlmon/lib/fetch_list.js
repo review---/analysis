@@ -4,12 +4,11 @@ var mongodb = require('mongodb');
 var sync = require('synchronize');
 
 function FetchList(node,colname) {
-	var node_split = node.split(':');
-	this.host = node_split[0];
-	var node_split_split = node_split[1].split('/');
-	this.port = node_split_split[0];
-	this.dbname = node_split_split[1];
-	this.colname = colname;
+	var mongo = common.parse_mongo(node);
+	this.host   = mongo.host;
+	this.port   = mongo.port;
+	this.dbname = mongo.dbname;
+	this.colname= colname;
 }
 //---------------------------------
 // constructor 

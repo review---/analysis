@@ -12,8 +12,10 @@ process.eputs = function(str){
 //var sys = require('sys');
 var sys = require('util');
 var opt = require('getopt');
+var path = require('path');
 var fs = require('fs');
 var mongodb = require('mongodb');
+var jsdom   = require('jsdom').jsdom;
 var sync = require('synchronize');
 
 //----------------------------------------------
@@ -31,17 +33,18 @@ common.mkdirp(DATA_DIR);
 //----------------------------------------------
 // Options
 //----------------------------------------------
+var JQUERY  = './lib/jquery-1.4.4.js';
 var WORKER  = null;
 var JOBS    = 1;
 var LOGLV   =  6;
 var FILE    = null;
-var MULTI   = false;
-var MONGO_NODE ='127.0.0.1:27017/htmlmon';
+var MONGO_NODE =null;
 var FIELD='body';
-var MONGO_NODE='127.0.0.1:27017/htmlmon';
-var MONGO_COL=null;
+var MONGO_QUERY={};
 var OUT='STDOUT';
 var CLEAR=null;
+var CONF    = null;
+var COND    = null;
 
 var TERM_FLG = false; // signal flag
 process.on('SIGINT', function () {
@@ -55,18 +58,16 @@ function help(a){
   sys.puts('Options:');
   sys.puts('   -l <loglv>     : Specify the loglv from 0 to 20 ( 6 is defalut )');
   sys.puts('   -f <inputfile> : Specify htmlfile otherwise read html from STDIN');
-  sys.puts('   -o <method>    : Output method      > STDOUT or 172.0.0.1:27017/htmlmon');
-  sys.puts('   -m             : Multiple line mode when STDIN');
-  sys.puts('   -F <field>     : HTML Field name    > body');
-  sys.puts('   -M <node>      : MongoDB instance   > 127.0.0.1:27017/htmlmon');
-  sys.puts('   -C <collection>: MongoDB collection name');
-  sys.puts('   -c             : Clear job collection');
+  sys.puts('   -o <method>    : Output method      > STDOUT or 172.0.0.1:27017/db.col');
+  sys.puts('   -m <node>      : MongoDB instance   > 127.0.0.1:27017/db.col');
+  sys.puts('   -c <conf-file> : Config file');
+  sys.puts('   -C             : Clear job collection');
   sys.puts('   -j <number>    : # Job process');
   process.exit(a);
 }
 
 try {
-  opt.setopt('hl:f:o:mF:M:C:cj:W',process.argv);
+  opt.setopt('hl:f:o:m:c:Cj:W',process.argv);
   opt.getopt(function ( o , p ){
     switch (o) {
       case 'h':
@@ -79,21 +80,15 @@ try {
       FILE = ''+p;
       break;
       case 'm':
-      MULTI = true;
-      break;
-      case 'F':
-      FIELD = ''+p;
-      break;
-      case 'M':
       MONGO_NODE = ''+p;
       break;
-      case 'C':
-      MONGO_COL = ''+p;
+      case 'c':
+      CONF = ''+p;
       break;
       case 'o':
       OUT = ''+p;
       break;
-      case 'c':
+      case 'C':
       CLEAR = true;
       break;
       case 'j':
@@ -107,6 +102,15 @@ try {
 }catch ( e ) {
   process.eputs('Invalid option ! "' + e.opt + '" => ' + e.type);
   help(1);
+}
+
+if ( CONF ) {
+  var conf = require(path.resolve(CONF)).get();
+	COND        = conf.COND;
+	FIELD       = common.cond_default(conf.FIELD,FIELD);
+	MONGO_QUERY = common.cond_default(conf.QUERY,MONGO_QUERY);
+	OUT         = common.cond_default(conf.OUT,OUT);
+	MONGO_NODE  = common.cond_default(conf.NODE,MONGO_NODE);
 }
 
 var LOG   = DATA_DIR + '/htmlpick.log';
@@ -161,29 +165,31 @@ sync.fiber(function(){
 	var out = new StdOut();
 
 	function MongoOut(){
-		var out_split = OUT.split(':');
-		var host = out_split[0];
-		var out_split_split = out_split[1].split('/');
-		var port = out_split_split[0];
-		var dbname = out_split_split[1];
+		var mongo = common.parse_mongo(OUT);
+		var host   = mongo.host;
+		var port   = mongo.port;
+		var dbname = mongo.dbname;
+		var colname= mongo.colname;
 		this.db = new mongodb.Db(dbname,
 														 mongodb.Server(host,port),
 														 { safe:true}
 														 );
 		sync.await(this.db.open(sync.defer()));
-		this.col = this.db.collection(MONGO_COL+'.out');
+		this.col = this.db.collection(colname);
 	}
 	MongoOut.prototype.out = function(ret){
 		log.message(ret._id,'mongoout','','');
 		ret.st  = 'success'
+		ret.ts  = new Date().getTime();
 		this.col.save(ret,function(){});
 	}
 	MongoOut.prototype.err = function(id,reason){
 		log.error(id,'error','','');
 		var ret = {};
 		ret._id = id;
-		ret.st  = 'error'
-		ret.reason  = reason
+		ret.st  = 'error';
+		ret.reason  = reason;
+		ret.ts  = new Date().getTime();
 		this.col.save(ret,function(){});
 	}
 	MongoOut.prototype.drop = function(){
@@ -198,8 +204,64 @@ sync.fiber(function(){
 		out = new MongoOut();
 	}
 	
-	var P = require(__dirname + '/lib/html_picker.js').html_picker(out);
-	if ( MONGO_COL ) {
+
+
+
+
+	function HtmlPicker(out){
+		this.out = out;
+	}
+	HtmlPicker.prototype.pick = function (id,body,conds,end){
+		var out = this.out;
+		if ( ! end ) {
+			end = function(){}
+		}
+		if ( ! body ) {
+			process.eputs('=== NO BODY ! ===' );
+			process.eputs(id['$oid']);
+			return;
+		}
+		try { 
+			jsdom.env({
+				html: body,
+				scripts: [path.resolve(__dirname, JQUERY)],
+				done: function (errors, window) {
+					jsdom.jQueryify(window, function (window, $) {
+						sync.fiber(function(){
+							try {
+									$('script').text('');
+									$('style').text('');
+								var text ='';
+								for ( var i in conds ) {
+									var cond = conds[i];
+										$(cond).text().split("\n").forEach(function(l){
+											var line = l.replace(/^\s+/,'').replace(/\s+/m,' ');
+											if ( line && line != ' ' ) {
+												text += line;
+											}
+										});
+									
+								}
+								var ret = { _id : id , body: text };
+								out.out(ret);
+								end(id,ret);
+							}catch(e){
+								out.err(id,e);
+								end(id);
+							}
+						}); // sync.fiber
+					}); // jquery-1.4.4.js
+				}
+			});				
+		}catch(e){
+			out.err(id,e);
+			end(id);
+		}
+	}
+	
+	
+	var P = new HtmlPicker(out);
+	if ( MONGO_NODE ) {
 		fromMongo();
 		return;
 	}
@@ -212,18 +274,17 @@ sync.fiber(function(){
 
 
 	function gettext(id,body,callback){
-		P.pick(id,body,['#topicsDetailCmp','#articleDetailCmp'],callback);
+		P.pick(id,body,COND,callback);
 	}
 
 	function fromMongo(){
 		var node = MONGO_NODE;
-		var colname = MONGO_COL;
 		log.echo(colname,'=== START (MONGO) ===',FIELD,node);
-		var node_split = node.split(':');
-		var host = node_split[0];
-		var node_split_split = node_split[1].split('/');
-		var port = node_split_split[0];
-		var dbname = node_split_split[1];
+		var mongo = common.parse_mongo(node);
+		var host   = mongo.host;
+		var port   = mongo.port;
+		var dbname = mongo.dbname;
+		var colname= mongo.colname;
 		sync.fiber(function(){
 			var db = new mongodb.Db(dbname,
 															mongodb.Server(host,port),
@@ -239,30 +300,35 @@ sync.fiber(function(){
 						sync.await(job.drop(sync.defer()));
 					}catch(e){
 					}
-					var colstat = sync.await(col.stats(sync.defer()));
-					var cursor = sync.await(col.find({},{_id:1},sync.defer()));
-					cursor.each(function(e,obj){
-						if ( ! (obj && '_id' in obj) ){
-							cursor.close();
-							return;
-						}
-						obj.st=0;
-						job.save(obj,function(){});
-					});
-					var interval = setInterval(function(){
-						sync.fiber(function(){
-							var jobstat = sync.await(job.stats(sync.defer()));
-							if ( jobstat.count == colstat.count ) {
-								clearInterval(interval);
-								sync.await(job.ensureIndex({st:1},sync.defer()));
-								log.echo(colname,'=== CLEAR (MONGO) ===',jobstat.count,node);
-								setTimeout(function(){
-									db.close();
-									process.exit(0);
-								},500);
+					try {
+						var cursor = sync.await(col.find(MONGO_QUERY,{_id:1},sync.defer()));
+						var count = sync.await(cursor.count(sync.defer()));
+						var fcount = 0;
+						cursor.each(function(e,obj){
+							if ( ! (obj && '_id' in obj) ){
+								cursor.close();
+								return;
 							}
+							obj.st=0;
+							job.insert(obj,function(){fcount++;});
 						});
-					},1000);
+						var interval = setInterval(function(){
+							sync.fiber(function(){
+								if ( fcount == count ) {
+									clearInterval(interval);
+									sync.await(job.ensureIndex({st:1},sync.defer()));
+									log.echo(colname,'=== CLEAR (MONGO) ===',fcount,node);
+									setTimeout(function(){
+										db.close();
+										process.exit(0);
+									},500);
+								}
+							});
+						},1000);
+					}catch(e){
+						log.error(colname,e,'',node);
+						process.exit(0);
+					}
 					return;
 				}
 				while (true ){
@@ -336,17 +402,10 @@ sync.fiber(function(){
 		var html = '';
 		process.stdin.on('data',function(chunk){
 			html += chunk;
-			if ( MULTI ) {
-				html = procline(html,false);
-			}
+			html = procline(html,false);
 		});
 		process.stdin.on('end',function(){
-			if ( MULTI ) {
-				procline(html,true);
-			}else{
-				var json = JSON.parse(html);
-				gettext(json._id,json[FIELD]);
-			}
+			procline(html,true);
 			setTimeout(function(){
 				process.exit(0);
 			},5000);

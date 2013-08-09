@@ -51,15 +51,15 @@ Kmeans.prototype.done = function(no){
 
 Kmeans.prototype.waitForJob = function(no){
 //	print('== waitForJob ==');
-	utils.waitfor_job(utils.getWritableCollection(this.CUR_J+'_'+no));
+	utils.waitfor_jobs(utils.getWritableCollection(this.CUR_J+'_'+no));
 }
 Kmeans.prototype.waitForData = function(){
 //	print('== waitForData ==');
-	utils.waitfor_job(utils.getCollection(this.CUR_DJ));
+	utils.waitfor_jobs(utils.getCollection(this.CUR_DJ));
 }
 Kmeans.prototype.waitForCluster = function(){
 //	print('== waitForCluster ==');
-	utils.waitfor_job(utils.getCollection(this.CUR_CJ));
+	utils.waitfor_jobs(utils.getCollection(this.CUR_CJ));
 }
 //Kmeans.prototype.isVacant = function(id){
 //	var prev = this._job.findAndModify({

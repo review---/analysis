@@ -2,6 +2,10 @@
 // Install these packages.
 //   npm install getopt
 //   npm install jsdom
+//   npm install request
+//   npm install synchronize
+//   npm install iconv
+
 process.eputs = function(str){
   process.stderr.write(str+'\n');
 }
@@ -17,11 +21,9 @@ var crypto  = require('crypto');
 var fs = require('fs');
 var path = require('path');
 var url = require('url');
-//var querystring = require('querystring');
-var http    = require('http');
-var https   = require('https');
 var jsdom   = require('jsdom').jsdom;
-
+var request = require('request');
+var iconv   = require('iconv');
 //----------------------------------------------
 // Definitions
 //----------------------------------------------
@@ -47,7 +49,7 @@ var WAIT    = null;
 var STDTEST = null;
 var URL     = null;
 var CONF    = null;
-var JQUERY  = 'jquery-1.4.4.js';
+var JQUERY  = 'lib/jquery-1.4.4.js';
 //var JQUERY  = 'file:///usr/local/cockatoo/tools/html/jquery-1.4.4.js';
 var RESUME  = null;
 var ERROR_RECOVERY  = null;
@@ -218,8 +220,11 @@ var STORAGE_FILE = require( __dirname + '/lib/storage_file.js');
 //var F   = require( __dirname + '/lib/fetch_list.js').fetch_list(FSTORAGE);
 var F   = require( __dirname + '/lib/fetch_list.js').fetch_list(MONGO_NODE,SETTING.TEST_NAME+'.q');
 var L   = require( __dirname + '/lib/fetch_logger.js').fetch_logger(MONGO_NODE,SETTING.TEST_NAME);
-if ( ! VERBOSE ) {
+if ( VERBOSE ) {
+	SETTING.TEST.FETCH_BODY = true;
+}else{
 	L = {
+    init: function(){},
     status: function(){},
     header: function(){},
     body: function(){}
@@ -405,7 +410,7 @@ function do_worker(){
       // memory check
 				var m = process.memoryUsage();
 				if (  TERM_FLG  || m.heapUsed >  MEM_THRESHOLD ) {
-					var exit = function (){
+					var exit = function () {
 						log.echo('=== Interrupt ===',m.heapUsed + ' > ' + MEM_THRESHOLD,SETTING.TEST_NAME);
 						process.exit(2);
 					}
@@ -485,65 +490,113 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
   log.trace(strurl,'TRY');
 	
   var rpath = parsed.pathname+common.cond_default(parsed.search,'');
-  if ( parsed.protocol === 'https:' ) {
-    var request = null;
-    if ( SETTING.SSLPROXY ) {
-      var px = /([^:]+):(\d+)/. exec(SETTING.SSLPROXY);
-//      proxy = http.request({'host':px[1],'port':px[2],'path':parsed.hostname+':'+((parsed.port)?parsed.port:443),'method':'CONNECT'});
-//      request = https.request({'host':parsed.host,'path':rpath,'method':'GET'});
-//      request.connection = proxy.connection;
-    }else{
-      log.trace('REQUEST GET: (' + parsed.hostname+common.cond_default(parsed.port,'')+')  : ' + rpath,reqHeaders);
-      request = https.request({'host':parsed.hostname,'port':parsed.port,'path':rpath,'method':'GET','headers':reqHeaders});
-    }
-    http_fetch(request);
-  }else if ( parsed.protocol === 'http:' ) {
-    var request = null;
-    if ( SETTING.PROXY ) {
-      var px = /([^:]+):(\d+)/. exec(SETTING.PROXY);
-      log.trace('PROXY GET: (' + px[1]+ ':'+px[2]+')  : ' + strurl , reqHeaders);
-      request = http.request({'host':px[1],'port':px[2],'path':strurl,'method':'GET'});
-    } else {
-      log.trace('REQUEST GET: (' + parsed.hostname+common.cond_default(parsed.port,'')+')  : ' + rpath,reqHeaders);
-      request = http.request({'host':parsed.hostname,'port':parsed.port,'path':rpath,'method':'GET','headers':reqHeaders});
-    }
-    http_fetch(request);
-  }else if ( parsed.protocol === 'file:' ) {
-    // fpath = strurl.replace(/^file:\/\/\//,'');
-    // file_fetch(fpath);
-  }
+
+//	var j = request.jar();
+//	j.add(request.cookie(reqHeaders['Cookie']));
+
+	var req_options = {
+		uri: strurl,
+		headers : reqHeaders,
+		timeout: SETTING.TIMEOUT,
+		encoding: null
+	};
+	var req = request( req_options , function ( error , res , body ) {
+		sync.fiber(function(){
+			try { 
+				if ( error ) {
+					if ( error.code === 'ETIMEDOUT' ) {
+						if ( F.timeout(strurl) ) {
+							log.error(strurl,'' + SETTING.TIMEOUT + ' (ms)','TIMEOUT');
+							TEST.ON_ERROR('TIMEOUT',strurl,'' + SETTING.TIMEOUT + ' (ms)','TIMEOUT');
+							return;
+						}
+					}else{
+				// error.code === 'ECONNREFUSED'
+						log.error(strurl,'HTTP ERROR',error.code);
+						TEST.ON_ERROR('REQUEST',strurl,'HTTP ERROR',error.code);
+					}
+					F.error(strurl);
+					return;
+				}
+  			// Status code
+				log.status(strurl,res.statusCode,'STATUS');
+				F.status_code(strurl,res.statusCode);
+				L.status(strurl,res.statusCode);
+				L.header(strurl,res.headers);
+				if ( ! (res.statusCode in  TEST.STATUS) ){
+					F.error(strurl);
+					log.error(strurl,res.statusCode,'BAD STATUS');
+					TEST.ON_ERROR('RESPONSE : ',strurl,res.statusCode,'BAD STATUS');
+					return;
+				}
+				C.store(parsed.hostname,res.headers['set-cookie']);
+				
+				if ( res.statusCode === 302 || res.statusCode === 301 ) {
+					F.skip_fetching(strurl,'REDIRECT');
+					var location = url.resolve(strurl,res.headers['location']);
+					log.trace(location,'LOCATION');
+					if ( strurl === location ) {
+						F.skip_fetching(strurl,'CIRCULAR LOCATION');
+						log.error(strurl,location,'CIRCULAR LOCATION');
+						TEST.ON_ERROR('REDIRECT',strurl,location,'CIRCULAR LOCATION');
+						return;
+					}
+					if ( do_filter('REDIRECT',location,TEST.REDIRECT.FILTER) ){
+						callback(location,res.headers,TEST,strurl);
+						F.skip_fetching(strurl,'REDIRECT');
+						return;
+					}
+					return;
+				}
+				if ( TEST.CHECKS.length === 0 && ! TEST.FETCH_BODY){
+					F.skip_fetching(strurl,'STATUS ONLY');
+					log.ok(strurl,res.statusCode,'status ok');
+					return;
+				}
+        // Body
+				log.debug('RESPONSE:'+strurl,res);
+				if ( ! body ) {
+					F.error(strurl);
+					log.error(strurl,content_type,'NO BODY',res.statusCode);
+					TEST.ON_ERROR('BODY',strurl,content_type,'NO BODY',res.statusCode);
+					return;
+				}
+
+				var content_type = res.headers['content-type'];
+				var match = /^text.+charset=(.+)$/.exec(content_type);
+				if ( match ) {
+					var charset = match[1];
+					if ( charset && charset !== 'utf-8' ) {
+						conv = new iconv.Iconv(charset,'UTF-8//TRANSLIT//IGNORE');
+						body = conv.convert(body);
+					}
+				}
+				body = body.toString();
+
+				L.body(strurl,res.statusCode,res.headers,body);
+				F.fetched(strurl,content_type,body.length);
+
+				if ( ! /html/.test(content_type) || TEST.CHECKS.length === 0 ) {
+					F.end(strurl);
+					log.ok(strurl,content_type,'fetch ok');
+					return;
+				}
+
+				try {
+					checkup_html(strurl,res.headers,body,TEST,callback);
+				}catch(e){
+					F.error(strurl);
+					log.error(strurl,content_type,'INVALID HTML',e.stack);
+					TEST.ON_ERROR('INVALID HTML',strurl,content_type,'INVALID HTML',e);
+				}
+      }catch(e){
+				F.error(strurl);
+				log.error(strurl,res.statusCode,'INVALID HTTP',e.stack);
+				TEST.ON_ERROR("HTTP_ERROR",strurl,res.statusCode,'INVALID HTTP',e);
+      }
+		}); // sync.fiber
+	});
 	
-//  log.debug('REQUEST : '+strurl,request);
-	
-	
-//  function file_fetch(fpath){
-//    content_type = 'text/html'; // @@@
-//    body = fs.readFileSync(fpath);
-//    L.body(strurl,body);
-//    if ( ! body ) {
-//      F.error(strurl);
-//      log.error(strurl,content_type,'NOT FOUND',fpath);
-//      TEST.ON_ERROR('BODY',strurl,content_type,'NOT_FOUND',fpath);
-//      return;
-//    }
-//    F.fetched(strurl,content_type,body.length);
-//    if ( ! /(html)|(css)/.test(content_type) || TEST.CHECKS.length === 0 ) {
-//      log.ok(strurl,content_type,'fetch ok');
-//      return;
-//    }
-//    if ( /html/.test(content_type) ) {
-//      body = '<html><body id="ROOT">'+body+'</body></html>';
-//    }else if ( /css/.test(content_type) ) {
-//      body = '<html><body id="ROOT"><html><style>'+body+'</style></html></body></html>';
-//    }
-//    try {
-//      checkup_html(strurl,{},body,TEST,callback);
-//    }catch(e){
-//      log.error(strurl,content_type,'INVALID HTML',e.stack);
-//      TEST.ON_ERROR(CHECK.METHOD,strurl,content_type,'INVALID HTML',e);
-//    }
-//    return;
-//  }
 	function do_filter ( pre, target , FILTER ) {
 		for ( var i in FILTER.ERROR ) {
 			if ( RegExp(FILTER.ERROR[i]).test(target) ) {
@@ -576,132 +629,15 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 	}
 
 
-  function http_fetch(request){
-    var TO=setTimeout(function () {
-			sync.fiber(function(){
-				if ( request ) {
-					request.abort();
-				}
-				if ( F.timeout(strurl) ) {
-					log.error(strurl,'' + SETTING.TIMEOUT + ' (ms)','TIMEOUT');
-					TEST.ON_ERROR('TIMEOUT',strurl,'' + SETTING.TIMEOUT + ' (ms)','TIMEOUT');
-				}
-			});
-    },SETTING.TIMEOUT);
-    
-    request.on('error',function(err){
-			sync.fiber(function(){
-				clearTimeout(TO);
-				F.error(strurl);
-				log.error(strurl,'HTTP ERROR',err);
-				TEST.ON_ERROR('REQUEST',strurl,'HTTP ERROR',err);
-			});// sync.fiber
-    });
-    
-    request.on('response',function(res){
-			sync.fiber(function(){
-      try {
-				log.status(strurl,res.statusCode,'STATUS');
-				F.status_code(strurl,res.statusCode);
-				L.status(strurl,res.statusCode);
-				L.header(strurl,res.headers);
-				if ( ! (res.statusCode in  TEST.STATUS) ){
-					clearTimeout(TO);
-					F.error(strurl);
-					log.error(strurl,res.statusCode,'BAD STATUS');
-					TEST.ON_ERROR('RESPONSE : ',strurl,res.statusCode,'BAD STATUS');
-					return;
-				}
-				C.store(parsed.hostname,res.headers['set-cookie']);
-				
-				if ( res.statusCode === 302 || res.statusCode === 301 ) {
-					clearTimeout(TO);
-					F.skip_fetching(strurl,'REDIRECT');
-					var location = url.resolve(strurl,res.headers['location']);
-					log.trace(location,'LOCATION');
-					if ( strurl === location ) {
-						log.error(strurl,location,'CIRCULAR LOCATION');
-						TEST.ON_ERROR('REDIRECT',strurl,location,'CIRCULAR LOCATION');
-						return;
-					}
-					if ( do_filter('REDIRECT',location,TEST.REDIRECT.FILTER) ){
-						callback(location,res.headers,TEST,strurl);
-						return;
-					}
-					return;
-				}
-				if ( TEST.CHECKS.length === 0 && ! TEST.FETCH_BODY){
-					clearTimeout(TO);
-					F.skip_fetching(strurl,'STATUS ONLY');
-					log.ok(strurl,res.statusCode,'status ok');
-					return;
-				}
-				res.setEncoding('utf8');
-				var body = '';
-				res.on('data',function(chunk){
-					body = body + chunk;
-				});
-				res.on('end',function(){
-					sync.fiber(function(){
-						L.body(strurl,res.statusCode,res.headers,body);
-						log.debug('RESPONSE:'+strurl,res);
-						if ( ! body ) {
-							clearTimeout(TO);
-							F.error(strurl);
-							log.error(strurl,content_type,'NO BODY',res.statusCode);
-							TEST.ON_ERROR('BODY',strurl,content_type,'NO BODY',res.statusCode);
-							return;
-						}
-						var content_type = res.headers['content-type'];
-						F.fetched(strurl,content_type,body.length);
-						if ( ! /(html)|(css)/.test(content_type) || TEST.CHECKS.length === 0 ) {
-							log.ok(strurl,content_type,'fetch ok');
-							clearTimeout(TO);
-							return;
-						}
-      // The error that "TypeError: Cannot call method 'call' of undefined" often occurs. It's jsdom has some bug ? ( conflecting body's script ? 
-						if ( /html/.test(content_type) ) {
-							body = '<html><body id="ROOT">'+body+'</body></html>';
-						}else if ( /css/.test(content_type) ) {
-							body = '<html><body id="ROOT"><html><style>'+body+'</style></html></body></html>';
-						}
-						try {
-							checkup_html(strurl,res.headers,body,TEST,callback);
-						}catch(e){
-							log.error(strurl,content_type,'INVALID HTML',e.stack);
-							TEST.ON_ERROR('INVALID HTML',strurl,content_type,'INVALID HTML',e);
-						}
-						clearTimeout(TO);
-						return;
-					}); // sync.fiber
-				});
-      }catch(e){
-				log.error(strurl,res.statusCode,'INVALID HTTP',e.stack);
-				TEST.ON_ERROR("HTTP_ERROR",strurl,res.statusCode,'INVALID HTTP',e);
-				clearTimeout(TO);
-				return;
-      }
-			}); // sync.fiber
-    });
-    request.end();
-  }  
   function checkup_html(strurl,res_headers,body,TEST,callback){
-    var document = jsdom(body,null,{
-//      url : strurl,
-      features:{
-				FetchExternalResources : false,
-				ProcessExternalResources : false,
-	//FetchExternalResources : ['script'],
-	//ProcessExternalResources : ['script'],
-					"MutationEvents"           : '2.0',
-					"QuerySelector"            : false
-      }
-    });
-		
-    var window = document.createWindow();
-		jsdom.jQueryify(window, JQUERY, function (window, $) {
-			sync.fiber(function(){
-      function uniq( arr ) {
+
+		jsdom.env({
+			html: '<html><body id="ROOT">'+body+'</body></html>',
+			scripts: [path.resolve(__dirname, JQUERY)],
+			done: function (errors, window) {
+
+		jsdom.jQueryify(window, function (window, $) {
+			function uniq( arr ) {
 				var buf = {};
 				return arr.filter(function (e){
 					if ( buf[e] ) {
@@ -710,9 +646,9 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 					buf[e] = true;
 					return true;
 				});
-      }
-      
-      function uniq_links( elements, links ) {
+			}
+			
+			function uniq_links( elements, links ) {
 				if ( ! links ){
 					links = [];
 				}
@@ -730,8 +666,8 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 					}
 				});
 				return uniq(links).sort().reverse();
-      }
-      function uniq_css_links( elements, links ) {
+			}
+			function uniq_css_links( elements, links ) {
 				if ( ! links ){
 					links = [];
 				}
@@ -760,88 +696,94 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 					}
 				});
 				return uniq(links).sort().reverse();
-      }
-      try{
-				for( var i in TEST.CHECKS ) {
-					try {
-						var CHECK = TEST.CHECKS[i];
-						if ( CHECK.METHOD == 'HOOK' ) {
-							try { 
-								var msg = CHECK.HOOK(TEST,strurl,referer,$('#ROOT > html'));
-								if ( msg  ) {
-									log.message(strurl,'HOOK','interrupt by hook',msg);
-									return;
+			}
+			sync.fiber(function(){
+				try{
+					for( var i in TEST.CHECKS ) {
+						try {
+							var CHECK = TEST.CHECKS[i];
+							if ( CHECK.METHOD == 'HOOK' ) {
+								try { 
+									var msg = CHECK.HOOK(TEST,strurl,referer,$('#ROOT > html'));
+									if ( msg  ) {
+										log.message(strurl,'HOOK','interrupt by hook',msg);
+										return;
+									}
+								}catch(e){
+									log.error(strurl,'','HOOK error',e.stack);
 								}
-							}catch(e){
-								log.error(strurl,'','HOOK error',e.stack);
-							}
-							log.ok(strurl,referer,'callback');
-						}else if ( CHECK.METHOD == 'CRAWL' ) {
-							log.ok(strurl,referer,'crawl ok');
-							var links = [];
-							for ( var s in CHECK.SELECTORS ) {
-								links = uniq_links($('#ROOT > html').find(CHECK.SELECTORS[s]),links);
-							}
-							for ( var l in links ) {
-								if ( do_filter('CRAWL',links[l],CHECK.FILTER )){
-									callback(links[l],res_headers,TEST,strurl);
+								log.ok(strurl,referer,'callback');
+							}else if ( CHECK.METHOD == 'CRAWL' ) {
+								log.ok(strurl,referer,'crawl ok');
+								var links = [];
+								for ( var s in CHECK.SELECTORS ) {
+									links = uniq_links($('#ROOT > html').find(CHECK.SELECTORS[s]),links);
 								}
-							}
-						} else {
-							var elements = $('#ROOT > html').find(CHECK.SELECTOR);
- 							log.debug('CHECK('+CHECK.METHOD+')',CHECK.SELECTOR); 
-							if ( CHECK.METHOD == 'EXIST' ) {
-								var size = elements.size();
-								if ( size === 0 ) {
-									throw [CHECK.METHOD,strurl,CHECK.SELECTOR,'ELEMENT NOT FOUND','(not found)'];
-								}else {
-									log.ok(strurl,CHECK.SELECTOR,'exist ok','');
-								}
-							}else if ( CHECK.METHOD == 'NOT_EXIST' ) {
-								var size = elements.size();
-								if ( size !== 0 ) {
-									throw [CHECK.METHOD,strurl,CHECK.SELECTOR,'UNEXPECTED ELEMENT FOUND',{Actual:elements.html()}];
-								}else {
-									log.ok(strurl,CHECK.SELECTOR,'not exist ok','');
-								}
-							}else if ( CHECK.METHOD == 'TEXT' ) {
-								var text = elements.text();
-								if ( ! RegExp(CHECK.EXPECTS).test(text) ) {
-									throw [CHECK.METHOD,strurl,CHECK.SELECTOR,'TEXT UNMATCH',{Expects:CHECK.EXPECTS,Actual:text}];
-								}else {
-									log.ok(strurl,CHECK.SELECTOR,'text ok');
-								}
-							}else if ( CHECK.METHOD == 'LINK' ) {
-								var links = uniq_links(elements);
 								for ( var l in links ) {
-									if ( do_filter('LINK',links[l],CHECK.FILTER )){
-										callback(links[l],res_headers,CHECK.TEST,strurl);
+									if ( do_filter('CRAWL',links[l],CHECK.FILTER )){
+										callback(links[l],res_headers,TEST,strurl);
 									}
 								}
-							}else if ( CHECK.METHOD == 'CSS' ) {
-								var links = uniq_css_links(elements);
-								for ( var l in links ) {
-									if ( do_filter('LINK',links[l],CHECK.FILTER )){
-										callback(links[l],res_headers,CHECK.TEST,strurl);
+							} else {
+								var elements = $('#ROOT > html').find(CHECK.SELECTOR);
+ 								log.debug('CHECK('+CHECK.METHOD+')',CHECK.SELECTOR); 
+								if ( CHECK.METHOD == 'EXIST' ) {
+									var size = elements.size();
+									if ( size === 0 ) {
+										throw [CHECK.METHOD,strurl,CHECK.SELECTOR,'ELEMENT NOT FOUND','(not found)'];
+									}else {
+										log.ok(strurl,CHECK.SELECTOR,'exist ok','');
 									}
+								}else if ( CHECK.METHOD == 'NOT_EXIST' ) {
+									var size = elements.size();
+									if ( size !== 0 ) {
+										throw [CHECK.METHOD,strurl,CHECK.SELECTOR,'UNEXPECTED ELEMENT FOUND',{Actual:elements.html()}];
+									}else {
+										log.ok(strurl,CHECK.SELECTOR,'not exist ok','');
+									}
+								}else if ( CHECK.METHOD == 'TEXT' ) {
+									var text = elements.text();
+									if ( ! RegExp(CHECK.EXPECTS).test(text) ) {
+										throw [CHECK.METHOD,strurl,CHECK.SELECTOR,'TEXT UNMATCH',{Expects:CHECK.EXPECTS,Actual:text}];
+									}else {
+										log.ok(strurl,CHECK.SELECTOR,'text ok');
+									}
+								}else if ( CHECK.METHOD == 'LINK' ) {
+									var links = uniq_links(elements);
+									for ( var l in links ) {
+										if ( do_filter('LINK',links[l],CHECK.FILTER )){
+											callback(links[l],res_headers,CHECK.TEST,strurl);
+										}
+									}
+								}else if ( CHECK.METHOD == 'CSS' ) {
+									var links = uniq_css_links(elements);
+									for ( var l in links ) {
+										if ( do_filter('LINK',links[l],CHECK.FILTER )){
+											callback(links[l],res_headers,CHECK.TEST,strurl);
+										}
+									}
+								}else{
+									throw [CHECK.METHOD,strurl,CHECK.METHOD,'UNKNOWN CHECK',''];
 								}
-							}else{
-								throw [CHECK.METHOD,strurl,CHECK.METHOD,'UNKNOWN CHECK',''];
 							}
+						}catch(e){
+							sys.puts('=============================');
+							sys.puts(e);
+							log.error(e[0],e[1],e[2],e[3]);
+							TEST.ON_ERROR(e[0],e[1],e[2],e[3],e[4]);
 						}
-					}catch(e){
-						log.error(e[0],e[1],e[2],e[3]);
-						TEST.ON_ERROR(e[0],e[1],e[2],e[3],e[4]);
-					}
-				} // for TEST.CHECKS
-				F.end(strurl);
-      }catch(e){
-				log.error(strurl,'jQueryify','Fatal error',e.stack);
-				F.error(strurl);
-      }
-
+					} // for TEST.CHECKS
+					F.end(strurl);
+				}catch(e){
+					log.error(strurl,'jQueryify','Fatal error',e.stack);
+					F.error(strurl);
+				}
+				window.close();
 			}); // sync.fiber
 		}); // jquery-1.4.4.js
+			}
+		});
+
   }
 }
 
