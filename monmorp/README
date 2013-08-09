@@ -54,10 +54,12 @@
 　　　|- [monmorp]
 　　      |- README
 　　      |- [bin]
-　　      |   |- gendic.sh    : IPADICからMONMPRP用の辞書をビルドします
-　　      |   |- tokenize.sh     : 形態素解析を行います
-　　      |- [lib]            : スクリプト群
-　　      |- [data]           : 一時データ用
+　　      |   |- gendic.sh         : IPADICからMONMPRP用の辞書をビルドします
+　　      |   |- tokenize.jp.sh    : 形態素解析を行います
+　　      |   |- keyword_search.sh : 形態素解析結果を利用してドキュメントを検索します
+　　      |   |- phrase.sh         : 熟語解析を行います
+　　      |- [lib]              : スクリプト群
+　　      |- [data]             : 一時データ用
 
 * クイックスタート
 　　０．MongoDBを準備
