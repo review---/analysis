@@ -92,7 +92,7 @@
 
 　　３．動作確認（形態素解析結果が出力されます
 
-　　　　　./bin/tokenize.sh -i "世界の皆さんこんにちは。" -o - -V
+　　　　　./bin/tokenize.jp.sh -i "世界の皆さんこんにちは。" -o - -V
 
 　　４．テストデータをMongoDBに投入
 
@@ -100,19 +100,51 @@
 
 　　５．複数ドキュメントを一気に解析
 
-　　　　　./bin/tokenize.sh -c test.sampledoc -f body -o test.token.sampledoc -C
-　　　　　./bin/tokenize.sh -c test.sampledoc -f body -o test.token.sampledoc
+　　　　　./bin/tokenize.jp.sh -s test.sampledoc -f body -o test.token.sampledoc -C
+　　　　　./bin/tokenize.jp.sh -s test.sampledoc -f body -o test.token.sampledoc
 
 
 　　　　並列処理する場合：
 
-　　　　　./bin/tokenize.sh -c test.sampledoc -f body -o test.token.sampledoc -C
-　　　　　./bin/tokenize.sh -c test.sampledoc -f body -o test.token.sampledoc -j 4
+　　　　　./bin/tokenize.jp.sh -s test.sampledoc -f body -o test.token.sampledoc -C
+　　　　　./bin/tokenize.jp.sh -s test.sampledoc -f body -o test.token.sampledoc -j 4
 
 
 　　６．結果を確認
 
-　　　　　mongo test <<<'db.out.find().sort({docid:1,idx:1})'
+　　　　　mongo test <<<'db.token.sampledoc.find().sort({docid:1,idx:1})'
+
+
+　　７．キーワード検索
+
+
+　　　　『ペーパー』を含むドキュメント：
+
+　　　　　./bin/keyword_search.sh -s test.token.sampledoc -w 'ペーパー' -V 
+
+　　　　『ペーパー』から始まる単語を含むドキュメント：
+
+　　　　　./bin/keyword_search.sh -s test.token.sampledoc -w 'ペーパー' -F -V 
+
+
+　　８．熟語解析
+
+　　　　　./bin/tokenize.jp.sh -s test.sampledoc -C
+　　　　　./bin/tokenize.jp.sh -s test.sampledoc
+
+　　　　並列処理する場合：
+
+　　　　　./bin/tokenize.jp.sh -s test.sampledoc -C
+　　　　　./bin/tokenize.jp.sh -s test.sampledoc -j 4
+
+
+　　９．熟語解析結果
+
+
+　　　　cvフィールドが大きい程、熟語の確率が高い：
+
+　　　　　mongo test <<<'db.phrse.token.sampledoc.find({cv:{$gt:0}}).sort({cv:-1})'
+
 
 
 * 詳細情報

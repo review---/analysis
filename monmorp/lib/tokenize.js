@@ -1,8 +1,8 @@
 var dictionary = new Dictionary(_DIC);
 
-var _src  = utils.getCollection(_SRC);
+var _src;
 var _dst;
-var _dst_job;
+var _job;
 if ( _OUT === '-' ) {
 		_dst = { 
 			save : function(ret) {
@@ -17,17 +17,18 @@ if ( _OUT === '-' ) {
 			},
 		};
 }else{
+	_src  = utils.getCollection(_SRC);
 	_dst     = utils.getWritableCollection(_OUT);
-	_dst_job = utils.getWritableCollection(_OUT + '.job');
-
-	this._dst.ensureIndex({d:1,i:1});
-	this._dst.ensureIndex({i:1});
-	this._dst.ensureIndex({w:1});
+	_job = utils.getWritableCollection(_OUT + '.job');
 }
+
 if ( _CJOB ) {
 	var _c_src = _src.find(utils.IGNORE_META,{_id:1});
-	utils.reset_job(_c_src,_dst_job);
-		_dst.drop();
+	utils.reset_job(_c_src,_job);
+	_dst.drop();
+	_dst.ensureIndex({d:1,i:1});
+	_dst.ensureIndex({i:1});
+	_dst.ensureIndex({w:1});
 	quit();
 }
 
@@ -47,7 +48,7 @@ var meta = {
 utils.setmeta(_dst,meta);
 
 while ( true ) {
-	var job = utils.get_job(_dst_job);
+	var job = utils.get_job(_job);
 	if ( ! job ) {
 		break;
 	}
