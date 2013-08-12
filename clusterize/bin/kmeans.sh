@@ -57,7 +57,7 @@ if [ "${CLEAR}" = "1" ];then
 fi
 
 if [ "${JOBS}" = "" ];then
-		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VFIELD}${CFIELD}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/kmeans.js.bk | grep -v '^loading file:'
+		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VFIELD}${CFIELD}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/kmeans.js | grep -v '^loading file:'
 		exit
 fi
 WAIT=''

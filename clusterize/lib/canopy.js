@@ -60,6 +60,8 @@ function canopy(_db,ns,def) {
 			return [true,prev_cluster_collection];
 		}
 		cs_history[md5sum] = n;
+
+		print('== T2 sampling  ==');
 		// Add cluster
 		var data_collection = _db.getCollection(data_collection_name);
 		var _c_data_collection = data_collection.find();
@@ -83,6 +85,7 @@ function canopy(_db,ns,def) {
 			}
 		}
 
+		print('== T1 sampling  ==');
 		data_collection.mapReduce (
 			function(){
 				for ( var c in cs ){
@@ -126,6 +129,7 @@ function canopy(_db,ns,def) {
 				}
 			});
 
+		print('== Reduce minor clusters  ==');
 		var cluster_collection = _db.getCollection(cluster_collection_name);
 		// Reduce minor
 		var threshold = data_collection.stats().count / cluster_collection.count() * def.threshold;
@@ -157,7 +161,7 @@ function canopy(_db,ns,def) {
 							}
 							if ( _VERBOSE ) {
 								if ( diff > 0 ){
-									print('Reduced closed cluster (diff:' + diff + ' < ' + def.t2 + ' )  ' + JSON.stringify(cluster.loc) + '  <>  ' + JSON.stringify(cmp.loc));
+									print('Reduced closed cluster (diff:' + diff + ' < ' + def.t2 + ' )  ');
 								}
 							}
 							newcs[i] = null;
@@ -196,19 +200,27 @@ function canopy(_db,ns,def) {
 
 
 print('== CANOPY ==');
-var _src_split  = _SRC.split('\.');
-var _db = _pmongo.getDB(_src_split.shift());
-var SRC         = _src_split.join('\.');
+var _src = utils.getCollection(_SRC);
+var meta   = utils.getmeta(_src);
 
-var meta=	utils.getmeta(_db.getCollection(SRC));
+var psrc = utils.parseCollection(_SRC);
+var _db = _pmongo.getDB(psrc.db);
+
 meta.vector = _SRC;
 if ( meta.normalize ) {
 		_NORMALIZE = true;
 }
 
-var canopy_cluster = canopy(_db,SRC,{t2:_T2,t1:_T1,threshold:_THRESHOLD});
+var canopy_cluster = canopy(_db,psrc.col,{t2:_T2,t1:_T1,threshold:_THRESHOLD});
+canopy_cluster = psrc.db+'.'+canopy_cluster;
 
+meta.canopy = {
+	ns:canopy_cluster,
+	t2:_T2,
+	t1:_T1,
+	threshold:_THRESHOLD
+}
 utils.setmeta(_db.getCollection(canopy_cluster),meta);
 
-print(canopy_cluster);
+print( ' == '+canopy_cluster+' == ');
 printjson(meta);

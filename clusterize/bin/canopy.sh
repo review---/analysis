@@ -13,8 +13,8 @@ Options :
     -v, --vector-filed name   : Vector field                      (defalut : 'value')
     -t, --threshold    float  : Cluster member minimum threashold (defalut : 0.1)
                               :  Ignoring clusters having member less than "#all-member / #cluster * threshold"
-    -2, --t2   float          : T2 cluster redius                 (defalut : 0.90)
-    -1, --t1   float          : T1 have to be bigger than T2      (defalut : 0.91)
+    -2, --t2   float          : T2 cluster redius                 (defalut : 0.93)
+    -1, --t1   float          : T1 have to be bigger than T2      (defalut : 0.94)
     -N, --normalize           : Normalize vector
     -V, --verbose             : 
 USAGE
@@ -24,8 +24,8 @@ USAGE
 EVAL=''
 VFIELD="var _VFIELD = 'value';";
 THREASHOLD="var _THRESHOLD=0.1;"
-T1="var _T1=0.88;"
-T2="var _T2=0.89;"
+T1="var _T1=0.93;"
+T2="var _T2=0.94;"
 VERBOSE="var _VERBOSE=false;"
 NORMALIZE="var _NORMALIZE=false;"
 

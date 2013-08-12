@@ -29,13 +29,15 @@ while ( _c_src.hasNext() ) {
 		}
 	}
 	if ( _VERBOSE ) {
+		var filter  = {id:1};
+		filter[meta.doc_field] = 1;
 		var _doc         = utils.getCollection(meta.doc);
 		var _c_data = _data.find({'value.c':cluster._id});
 		while(_c_data.hasNext()){
 			var data = _c_data.next();
 			var oid = ObjectId(data._id);
-			var doc = _doc.findOne({_id:oid},{_id:0})
-			print(JSON.stringify(doc).slice(0,90));		
+			var doc = _doc.findOne({_id:oid},filter);
+			print('_id:('+ doc._id + ') : ' + utils.strView(doc[meta.doc_field],_VERBOSE_LEN));		
 		}
 	}
 }

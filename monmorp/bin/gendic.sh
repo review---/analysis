@@ -7,7 +7,8 @@ cat<<USAGE
 Usage :
   gendic.sh [options]
 
-  Compile dictionary collection.
+Summary:
+  Compile the dictionary collection.
     1. Import from IPADIC when specified -i option
     2. Compile from 1. to specified collection.
     3. Some amendment.

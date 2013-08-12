@@ -1,12 +1,16 @@
 var _NGRAM=4;
 var _THRESHOLD=1.0;
 
-var _src_split = _SRC.split('\.');
-var _DB    = _src_split.shift();
-var SRC    = _src_split.join('\.');
+var psrc = utils.parseCollection(_SRC);
+
 var _src   = utils.getCollection(_SRC);
 var meta   = utils.getmeta(_src);
-var TMP = _DB + '.phrse.' + SRC;
+if ( ! meta || 	meta.type !== 'TOKEN' ) {
+	print('== Invalid collection : ' + _src + ' ==');
+	printjson(meta);
+	quit();
+}
+var TMP = psrc.db + '.phrse.' + psrc.col;
 var _tmp = utils.getWritableCollection(TMP);
 var _job = utils.getWritableCollection(TMP+'.job1');
 var dic = new Dictionary(meta.dic);

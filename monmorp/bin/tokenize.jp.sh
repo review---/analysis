@@ -7,6 +7,7 @@ cat<<USAGE
 Usage :
   tokenize.jp.sh [options]
 
+Summary:
   Parse Japanese sentense by morphological analysis.
   It use "analysis.dictionary" collelction as dictionary by default.
 
@@ -29,6 +30,7 @@ USAGE
 
 
 EVAL=''
+OUT="var _OUT='';"
 VERBOSE='var _VERBOSE=false;'
 DIC="var _DIC='analysis.dictionary';"
 QUERY='var _QUERY={};'
@@ -36,7 +38,7 @@ SENTENSE='var _SENTENSE=false;'
 CJOB="var _CJOB=false;"
 CLEAR=
 JOBS=''
-OPTIONS=`getopt -o hd:s:f:q:o:i:j:CV --long help,dictionary:,source:,field:,query:,output:,input:,jobs:,clearjob,verbose, -- "$@"`
+OPTIONS=`getopt -o hd:s:o:f:q:i:j:CV --long help,dictionary:,source:,output:,field:,query:,input:,jobs:,clearjob,verbose, -- "$@"`
 if [ $? != 0 ] ; then
   exit 1
 fi
@@ -47,9 +49,9 @@ while true; do
 				-h|--help)       usage 0 ;;
 				-d|--dictionary) DIC="var _DIC='${OPTARG}';";shift;;
 				-s|--source)     EVAL="${EVAL}var _SRC='${OPTARG}';";shift;;
+				-o|--output)     OUT="var _OUT='${OPTARG}';";shift;;
 				-f|--field)      EVAL="${EVAL}var _FIELD='${OPTARG}';";shift;;
 				-q|--query)      QUERY="var _QUERY=${OPTARG};";shift;;
-				-o|--output)     EVAL="${EVAL}var _OUT='${OPTARG}';";shift;;
 				-i|--input)      SENTENSE="var _SENTENSE='`echo \"${OPTARG}\"|tr "\n" " "`';";shift;;
 				-j|--jobs)       JOBS="${OPTARG}";shift;;
 				-C|--clearjob)   CLEAR="1";;
@@ -67,13 +69,13 @@ fi
 
 echo '    DOCID                  : #COMPARES'
 if [ "${JOBS}" = "" ];then
-		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${VERBOSE}${DIC}${QUERY}${SENTENSE}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/dictionary.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/jptokenizer.js ${CURDIR}/../lib/tokenize.js | grep -v '^loading file:'
+		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${OUT}${VERBOSE}${DIC}${QUERY}${SENTENSE}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/dictionary.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/jptokenizer.js ${CURDIR}/../lib/tokenize.js | grep -v '^loading file:'
 		exit
 fi
 WAIT=''
 EXEC=''
 for i in `eval echo "{1..${JOBS}}"`; do
-		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${VERBOSE}${DIC}${QUERY}${SENTENSE}${CJOB}\\" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/dictionary.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/jptokenizer.js ${CURDIR}/../lib/tokenize.js;` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
+		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${OUT}${VERBOSE}${DIC}${QUERY}${SENTENSE}${CJOB}\\" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/dictionary.js ${CURDIR}/../lib/morpho.js ${CURDIR}/../lib/jptokenizer.js ${CURDIR}/../lib/tokenize.js;` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
 done
 eval $EXEC
 for p in $WAIT; do

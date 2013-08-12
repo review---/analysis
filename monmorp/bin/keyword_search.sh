@@ -24,7 +24,7 @@ FOWARD=''
 VERBOSE="var _VERBOSE=false;"
 VERBOSE_LEN="var _VERBOSE_LEN=80;"
 
-OPTIONS=`getopt -o hs:v:w:FL:V --long help,source:,word:,forward-match,verbose-length:,verbose, -- "$@"`
+OPTIONS=`getopt -o hs:v:w:FVL: --long help,source:,word:,forward-match,verbose,verbose-length:, -- "$@"`
 if [ $? != 0 ] ; then
   exit 1
 fi

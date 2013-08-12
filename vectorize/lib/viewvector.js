@@ -13,7 +13,7 @@ while ( _c_src.hasNext() ) {
 		vs.push({id:i,s:l});
 	}
 	var vs = utils.sort(vs,function(a,b){ return (a.s > b.s); });
-	for ( i = 0 ; i < 10 ; i++ ) {
+	for ( i = 0 ; i < _VERBOSE_LEN ; i++ ) {
 		var o = ObjectId(vs[i].id);
 		var v = _dictionary.findOne({_id:o});
 		print( vs[i].s + "\t : " + v.w );

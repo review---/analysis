@@ -27,62 +27,20 @@ Kmeans.prototype.prepareIt = function(){
 	this.CUR_DJ = this.DB + '.' + 'kmeans.'+this.NS+'.it'+(this.N+1)+'.data.job';
 	this._prev_d= utils.getCollection(this.PREV_D);
   this._prev_c= utils.getCollection(this.PREV_C);
+	this._job   = utils.getWritableCollection(this.CUR_J);
 	this._djob  = utils.getWritableCollection(this.CUR_DJ);
   this._cjob  = utils.getWritableCollection(this.CUR_CJ);
 	this.N++;
 }
 
-Kmeans.prototype.is_vacant = function(no){
-	var _job = utils.getWritableCollection(this.CUR_J+'_'+no);
-	_job.ensureIndex({st:1});
-	var prev = _job.findAndModify({
-		query: utils.META,
-		update:{ $setOnInsert:{st:1}},
-		upsert:true
-	});	
-	if ( prev ) {
-		return false;
-	}
-	return true;
-}
-Kmeans.prototype.done = function(no){
-	utils.getWritableCollection(this.CUR_J+'_'+no).update(utils.META,{ $set : { st : 2 } } );
-}
-
-Kmeans.prototype.waitForJob = function(no){
-//	print('== waitForJob ==');
-	utils.waitfor_jobs(utils.getWritableCollection(this.CUR_J+'_'+no));
-}
 Kmeans.prototype.waitForData = function(){
 //	print('== waitForData ==');
-	utils.waitfor_jobs(utils.getCollection(this.CUR_DJ));
+	utils.waitfor_jobs(this._djob);
 }
 Kmeans.prototype.waitForCluster = function(){
 //	print('== waitForCluster ==');
-	utils.waitfor_jobs(utils.getCollection(this.CUR_CJ));
+	utils.waitfor_jobs(this._cjob);
 }
-//Kmeans.prototype.isVacant = function(id){
-//	var prev = this._job.findAndModify({
-//		query: {_id:id},
-//		update:{ $setOnInsert:{ done:0}},
-//		upsert:true
-//	});
-//	if ( prev ) {
-//		return false;
-//	}
-//	return true;
-//}
-//Kmeans.prototype.wait = function(){
-//	while(true){
-//		if ( ! this._pjob.find({done:0}).count() ){
-//			break;
-//		}
-//		sleep(1000);
-//	}
-//}
-//Kmeans.prototype.done = function(id){
-//	this._job.update({_id:id},{ $set : { done : 1 } } );
-//}
 
 
 Kmeans.prototype.getCluster = function(CLUSTER,FIELD){
@@ -98,7 +56,8 @@ Kmeans.prototype.getCluster = function(CLUSTER,FIELD){
 // Comvert from datacol to kmeans.data
 Kmeans.prototype.first = function(CLUSTER,CFIELD,VFIELD){
 	var JOBID = 0;
-	if ( this.is_vacant(JOBID) ) {
+	
+	if ( utils.sync_job(this._job,JOBID) ) {
 		print('== first ==');
 		var _cluster = utils.getWritableCollection(this.CUR_C);
 		var cs = this.getCluster(CLUSTER,CFIELD);
@@ -119,14 +78,13 @@ Kmeans.prototype.first = function(CLUSTER,CFIELD,VFIELD){
 					});					
 			}
 		}
-		this.done(JOBID);
+		utils.end_job(this._job,JOBID);
 	}
-	this.waitForJob(JOBID);
 }
 
 Kmeans.prototype.createJob = function(){
 	var JOBID = 1;
-	if ( this.is_vacant(JOBID) ) {
+	if ( utils.sync_job(this._job,JOBID) ) {
 		print('== createJob ( '+this.N+' ) ==');
   	// Data job
   	var _c_prev_data = this._prev_d.find(utils.IGNORE_META,{_id:1});
@@ -134,9 +92,8 @@ Kmeans.prototype.createJob = function(){
   	// Cluster job
 		var _c_prev_cluster = this._prev_c.find(utils.IGNORE_META,{_id:1});
 		utils.reset_job(_c_prev_cluster,this._cjob);
-		this.done(JOBID);
+		utils.end_job(this._job,JOBID);
 	}
-	this.waitForJob(JOBID);
 }
 
 Kmeans.prototype.dataIterate = function(){
@@ -166,6 +123,7 @@ Kmeans.prototype.dataIterate = function(){
 //		if ( ! this.isVacant(id) ) {
 //			continue;
 //		}
+
 	while (true){
 		var job = utils.get_job(this._djob);
 		if ( ! job ) {
@@ -188,7 +146,7 @@ Kmeans.prototype.dataIterate = function(){
 			if ( diff ) {
 				score = 1/diff;
 			}
-			data.value.cs.push({c:c,s:score});
+			data.value.cs.push({c:cs[c].name,s:score});
 			cssum += score;
 		}
 			// data
@@ -245,7 +203,7 @@ Kmeans.prototype.finish = function(){
 	var prev_d = this.PREV_D;
 
 	var JOBID = 2;
-	if ( this.is_vacant(JOBID) ) {
+	if ( utils.sync_job(this._job,JOBID) ) {
 		utils.getWritableCollection(prev_c).renameCollection(this.FIN_C);
 		utils.getWritableCollection(prev_d).renameCollection(this.FIN_D);
 		
@@ -256,10 +214,8 @@ Kmeans.prototype.finish = function(){
 		utils.setmeta(utils.getWritableCollection(this.meta.cluster),this.meta);
 		utils.setmeta(utils.getWritableCollection(this.meta.data),this.meta);
 		printjson(this.meta);
-		
-		this.done(JOBID);
+		utils.end_job(this._job,JOBID);
 	}
-	this.waitForJob(JOBID);
 }
 
 var kmeans = new Kmeans(_SRC);

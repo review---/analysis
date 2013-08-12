@@ -2,6 +2,9 @@ var _src         = utils.getCollection(_SRC);
 var meta         = utils.getmeta(_src);
 
 var docs = {};
+if ( _VERBOSE ) {
+	printjson(_QUERY);
+}
 var _c_src = _src.find(_QUERY);
 while ( _c_src.hasNext() ) {
 	var token = _c_src.next();
@@ -10,26 +13,6 @@ while ( _c_src.hasNext() ) {
 		docs[docid] = 0;
 	}
 	docs[docid]++;
-//	var ls = [];
-//	for ( var i in cluster.value.loc ) {
-//		var l = cluster.value.loc[i];
-//		ls.push({id:i,s:l});
-//	}
-//	var ls = utils.sort(ls,function(a,b){ return (a.s > b.s); });
-//	for ( i = 0 ; i < 10 ; i++ ) {
-//		var o = ObjectId(ls[i].id);
-//		var v = _dictionary.findOne({_id:o});
-//		print( ls[i].s + "\t : " + v.w );
-//	}
-//	if ( _VERBOSE ) {
-//		var _c_data = _data.find({'value.c':cluster._id});
-//		while(_c_data.hasNext()){
-//			var data = _c_data.next();
-//			var oid = ObjectId(data._id);
-//			var doc = _doc.findOne({_id:oid},{_id:0})
-//			print(JSON.stringify(doc).slice(0,50));		
-//		}
-//	}
 }
 var sorted_docs = [];
 for ( var i in docs ){

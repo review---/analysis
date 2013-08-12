@@ -7,9 +7,13 @@ cat<<USAGE
 Usage :
   df.sh [options]
 
+Summary:
+  Calculate the DF (Document-Frequency) from TF.
+
 Options :
     -h, --help                : This message
-    -s, --source      ns      : Target collection ns
+    -s, --source      ns      : Target collection ns > ( TF collection )
+    -o, --output      ns      : Output collection ns
     -k, --key-filed   name    : Key field      (default : 'd')
     -w, --word-field  name    : Word field     (default : 'c')
     -j, --jobs        num     : Number of jobs
@@ -20,6 +24,7 @@ USAGE
 
 
 EVAL=''
+OUT="var _OUT='';"
 QUERY='var _QUERY={};'
 KEY="var _KEY='d';"
 WORD="var _WORD='c';"
@@ -27,7 +32,7 @@ CJOB="var _CJOB=false;"
 CLEAR=
 JOBS=''
 
-OPTIONS=`getopt -o hs:k:w:q:j:C --long help,source:,key-field:,word-field:,query:,jobs:,clearjob, -- "$@"`
+OPTIONS=`getopt -o hs:o:k:w:q:j:C --long help,source:,output:,key-field:,word-field:,query:,jobs:,clearjob, -- "$@"`
 if [ $? != 0 ] ; then
   exit 1
 fi
@@ -37,6 +42,7 @@ while true; do
     case $1 in
 				-h|--help)       usage 0 ;;
 				-s|--source)     EVAL="${EVAL}var _SRC='${OPTARG}';";shift;;
+				-o|--output)     OUT="var _OUT='${OPTARG}';";shift;;
 				-k|--key-field)  KEY="var _KEY=${OPTARG};";shift;;
 				-w|--word-field) WORD="var _WORD=${OPTARG};";shift;;
 				-q|--query)      QUERY="var _QUERY=${OPTARG};";shift;;
@@ -54,13 +60,13 @@ if [ "${CLEAR}" = "1" ];then
 fi
 
 if [ "${JOBS}" = "" ];then
-		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${KEY}${WORD}${QUERY}${CJOB}" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/vectorize.js ${CURDIR}/../lib/df.js | grep -v '^loading file:'
+		${MONGO_SHELL} ${MONGO_NODE} --quiet --eval "${EVAL}${OUT}${KEY}${WORD}${QUERY}${CJOB}" ${CURDIR}/../../lib/utils.js  ${CURDIR}/../lib/df.js | grep -v '^loading file:'
 		exit
 fi
 WAIT=''
 EXEC=''
 for i in `eval echo "{1..${JOBS}}"`; do
-		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${KEY}${WORD}${QUERY}${CJOB}\\" ${CURDIR}/../../lib/utils.js ${CURDIR}/../lib/vectorize.js ${CURDIR}/../lib/df.js` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
+		EXEC="${EXEC}`echo ${MONGO_SHELL} ${MONGO_NODE} --quiet --eval \\"${EVAL}${OUT}${KEY}${WORD}${QUERY}${CJOB}\\" ${CURDIR}/../../lib/utils.js  ${CURDIR}/../lib/df.js` | grep -v '^loading file:' & WAIT=\"\${WAIT} \$!\";"
 done
 eval $EXEC
 for p in $WAIT; do

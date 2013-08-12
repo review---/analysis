@@ -1,5 +1,10 @@
 var dictionary = new Dictionary(_DIC);
 
+var psrc = utils.parseCollection(_SRC);
+if ( ! _OUT ){
+	_OUT = psrc.db + '.token.' + psrc.col;
+}
+
 var _src;
 var _dst;
 var _job;
@@ -42,7 +47,10 @@ if ( _SENTENSE ) {
 }
 
 var meta = { 
+	type: 'TOKEN',
+	token: _OUT,
 	doc: _SRC,
+	doc_field: _FIELD,
 	dic: _DIC
 };
 utils.setmeta(_dst,meta);
@@ -58,3 +66,4 @@ while ( true ) {
 	tokenizer.parse_doc(doc._id,utils.getField(doc,_FIELD));
 	print ( doc._id.toString() + ' : ' + tokenizer.nquery + ' ( ' + tokenizer.nfetch + ' ) ');
 }
+print( ' == '+_OUT+' == ');
