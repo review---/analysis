@@ -48,6 +48,7 @@ var TIMEOUT = null;
 var WAIT    = null;
 var STDTEST = null;
 var URL     = null;
+var TEST_NAME = null;
 var CONF    = null;
 var JQUERY  = 'lib/jquery-1.4.4.js';
 //var JQUERY  = 'file:///usr/local/cockatoo/tools/html/jquery-1.4.4.js';
@@ -55,7 +56,7 @@ var RESUME  = null;
 var ERROR_RECOVERY  = null;
 var VERBOSE = null;
 var PARALLEL= 1;
-var ANALYZE = null;
+var APPEND  = null;
 var MONGO_NODE='127.0.0.1:27017/htmlmon';
 
 function help(a){
@@ -73,39 +74,40 @@ function help(a){
   sys.puts('   -F             : Standerd test (with fetching body) mode');
   sys.puts('   -S             : Standerd test (with fetching body , parsing style) mode');
   sys.puts('   -C             : Crawl test mode');
+  sys.puts('   -N <name>      : Specify the TSET_NAME ');
   sys.puts('   -u <url>       : Specify the target-url ');
   sys.puts('   -c <conf-file> : Specify the config file path');
   sys.puts('   -q <jquery>    : Specify the jquery file ( jquery-1.4.4.js is default )');
   sys.puts('   -j <number>    : Specify the number of the parallel download ( 1 is default )');
   sys.puts('   -R             : Resume mode. if you want to resume prior WATCH is interrupted by anything');
   sys.puts('   -E             : Resume with error recovery. Specify with -R');
-  sys.puts('   -A             : Analyze fetch log');
   sys.puts('   -V             : Verbose log if you want to preserve all contents');
   sys.puts('   -M             : MongoDB instance > 127.0.0.1:27017/htmlmon');
+  sys.puts('   -A             : Append fetch');
   process.exit(a);
 }
 
 try {
-  opt.setopt('hl:p:s:u:w:t:c:j:q:BTFSCREVAM:W',process.argv);
+  opt.setopt('hl:p:s:u:N:w:t:c:j:q:BTFSCREVAM:W',process.argv);
   opt.getopt(function ( o , p ){
     switch (o) {
       case 'h':
       help(0);
       break;
       case 'l':
-      LOGLV = p;
+      LOGLV = p[0];
       break;
       case 'p':
-      PROXY = ''+p;
+      PROXY = p[0];
       break;
       case 's':
-      SSLPROXY = ''+p;
+      SSLPROXY = p[0];
       break;
       case 't':
-      TIMEOUT = p;
+      TIMEOUT = p[0];
       break;
       case 'w':
-      WAIT = p;
+      WAIT = p[0];
       break;
       case 'B':
       STDTEST   = 'BSTD';
@@ -123,16 +125,23 @@ try {
       STDTEST   = 'CRAWL';
       break;
       case 'u':
-      URL = ''+p;
+			if ( p.length === 1) {
+				URL = p[0];
+			}else{
+				URL = p;
+			}
+      break;
+      case 'N':
+      TEST_NAME = p[0];
       break;
       case 'c':
-      CONF = ''+p;
+      CONF = p[0];
       break;
       case 'q':
-      JQUERY = ''+p;
+      JQUERY = p[0];
       break;
       case 'j':
-      PARALLEL = p;
+      PARALLEL = p[0];
       break;
       case 'R':
       RESUME = 1;
@@ -144,10 +153,10 @@ try {
       VERBOSE = 1;
       break;
       case 'A':
-      ANALYZE = 1;
+      APPEND = 1;
       break;
       case 'M':
-      MONGO_NODE = ''+p;
+      MONGO_NODE = p[0];
       break;
       case 'W':
       WORKER = 1;
@@ -179,12 +188,13 @@ if ( CONF ) {
   SETTING = conf.get();
 }
 // Override member on config
+SETTING.TEST_NAME = common.cond_default(TEST_NAME,SETTING.TEST_NAME);;
 SETTING.URL     =common.cond_default(URL,SETTING.URL);
 SETTING.PROXY   =common.cond_default(PROXY,SETTING.PROXY);
 SETTING.SSLPROXY=common.cond_default(SSLPROXY,SETTING.SSLPROXY);
 SETTING.TIMEOUT =common.cond_default(TIMEOUT,SETTING.TIMEOUT);
 SETTING.WAIT    =common.cond_default(WAIT,SETTING.WAIT);
-SETTING.TEST    =(STDTEST==='BSTD')?   stdtest.FETCH_TEST       :SETTING.TEST;
+SETTING.TEST    =(STDTEST==='BSTD')?   stdtest.FETCH_TEST     :SETTING.TEST;
 SETTING.TEST    =(STDTEST==='STD')?    stdtest.STD_TEST       :SETTING.TEST;
 SETTING.TEST    =(STDTEST==='FSTD')?   stdtest.FSTD_TEST      :SETTING.TEST;
 SETTING.TEST    =(STDTEST==='CSTD')?   stdtest.CSTD_TEST      :SETTING.TEST;
@@ -220,9 +230,11 @@ var STORAGE_FILE = require( __dirname + '/lib/storage_file.js');
 //var F   = require( __dirname + '/lib/fetch_list.js').fetch_list(FSTORAGE);
 var F   = require( __dirname + '/lib/fetch_list.js').fetch_list(MONGO_NODE,SETTING.TEST_NAME+'.q');
 var L   = require( __dirname + '/lib/fetch_logger.js').fetch_logger(MONGO_NODE,SETTING.TEST_NAME);
+
 if ( VERBOSE ) {
-	SETTING.TEST.FETCH_BODY = true;
-}else{
+	SETTING.FETCH_BODY = true;
+}
+if (! SETTING.FETCH_BODY) {
 	L = {
     init: function(){},
     status: function(){},
@@ -249,78 +261,6 @@ function fork_worker(){
     log.echo(SETTING.URL,'Wait child ',code);
     if ( code === 2 && !TERM_FLG ) {
 				fork_worker();
-    }else{
-//				if ( ANALYZE ) {
-//					F.load();
-//					var list = F.get();
-//	  // log.info('====ANALYZE==',list);
-//					var result = {};
-//					for ( var u in list ) {
-//						if ( ! /^https?:/.test(u) ) {
-//							continue;
-//						}
-//						var val = list[u];
-//						var parsed = url.parse(u);
-//						var domain = parsed.hostname+common.cond_default(parsed.port,'');
-//						if ( val.Queuing.code === 'ROOT' ) {
-//							domain = '*' + domain;
-//						}
-//						if ( ! result[domain] ) {
-//							result[domain] = {js:0,css:0,html:0,img:0,other:0,error:0,timeout:0,total_size:0,total_time:0,max_time:0};
-//						}
-//						var time = val.End.date - val.Fetching.date;
-//						if ( val.End.code === 'ERROR' ) {
-//							result[domain].error++;
-//	      //time = 0;
-//						}else if ( val.End.code === 'TIMEOUT' ) {
-//							result[domain].timeout++;
-//	      //time = 0;
-//						}else if (typeof(val.End.code) === 'object') {
-//							if (       /html/.test(val.End.code.content_type)) {
-//								result[domain].html++;
-//							}else if ( /javascript/.test(val.End.code.content_type)) {
-//								result[domain].js++;
-//							}else if ( /css/.test(val.End.code.content_type)) {
-//								result[domain].css++;
-//							}else if ( /image/.test(val.End.code.content_type)) {
-//								result[domain].img++;
-//							}else{
-//								result[domain].other++;
-//							}
-//							result[domain].total_size += val.End.code.size;
-//						}else{
-//							result[domain].other++;
-//						}
-//						result[domain].total_time += time;
-//						if ( result[domain].max_time < time ) {
-//							result[domain].max_time = time;
-//						}
-//					}
-//	  // log.info('====RESULT==',result);
-//					var root = null;
-//					var summary = {js:0,css:0,html:0,img:0,other:0,error:0,timeout:0,total:0,total_time:0,total_size:0,ptime:0};
-//					for ( var d in result ) {
-//						if ( /^\*/.test(d) ) {
-//							root = d;
-//						}else{
-//							summary.total_time  += result[d].total_time;
-//						}
-//						summary.html += result[d].html;
-//						summary.js   += result[d].js;
-//						summary.css  += result[d].css;
-//						summary.img  += result[d].img;
-//						summary.other+= result[d].other;
-//						summary.error+= result[d].error;
-//						summary.timeout+= result[d].timeout;
-//						summary.total+= result[d].html+result[d].js+result[d].css+result[d].img+result[d].other+result[d].error+result[d].timeout;
-//						summary.total_size+= result[d].total_size;
-//					}
-//					var P = 16;
-//					summary.ptime = Math.floor(result[root].total_time + result[root].total_size/100 + summary.total_time/P);
-//					result['SUMMARY'] = summary;
-//					log.info('====RESULT==',result);
-//					sys.puts(JSON.stringify(result));
-//				}
     }
 		}); // sync.fiber
   });
@@ -369,8 +309,8 @@ function do_worker(){
   // Resume mode
 	if ( RESUME ) {
 		F.init();
-		L.init();
 		C.init();
+		L.init();
 		if ( ERROR_RECOVERY ){
 			F.resetError();
 			log.echo(SETTING.URL,'=== RESET ERRORS ===',SETTING.TEST_NAME );
@@ -379,10 +319,20 @@ function do_worker(){
 		log.echo(SETTING.URL,'=== CONTINUE ===',SETTING.TEST_NAME);
 	}else{
 		F.init(true);
-		L.init(true);
 		C.init(true);
-		
-		F.queuing(SETTING.URL,SETTING.TEST);
+		if ( APPEND ) {
+			L.init();
+		}else{
+			L.init(true);
+		}
+		if ( typeof SETTING.URL === 'string' ) {
+			F.queuing(SETTING.URL,SETTING.TEST);
+		}else{
+			for ( var i in SETTING.URL ) {
+				F.queuing(SETTING.URL[i],SETTING.TEST);
+				
+			}
+		}
 		log.echo(SETTING.URL,'=== START ===',SETTING.TEST_NAME);
 	}
 	
@@ -548,7 +498,7 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 					}
 					return;
 				}
-				if ( TEST.CHECKS.length === 0 && ! TEST.FETCH_BODY){
+				if ( TEST.CHECKS.length === 0 && ! SETTING.FETCH_BODY){
 					F.skip_fetching(strurl,'STATUS ONLY');
 					log.ok(strurl,res.statusCode,'status ok');
 					return;
@@ -657,12 +607,14 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 					var href = $(this).attr('href');
 					if ( href ) {
 						var link = href.replace(re,'');
-						links.push(url.resolve(strurl,encodeURI(link)));
+						links.push(url.resolve(strurl,link));
+//						links.push(url.resolve(strurl,encodeURI(link)));
 					}
 					var src = $(this).attr('src');
 					if ( src ) {
 						var link = src.replace(re,'');
-						links.push(url.resolve(strurl,encodeURI(link)));
+						links.push(url.resolve(strurl,link));
+//						links.push(url.resolve(strurl,encodeURI(link)));
 					}
 				});
 				return uniq(links).sort().reverse();
@@ -679,7 +631,8 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 						if ( ! matches ) {
 							break;
 						}
-						links.push(url.resolve(strurl,encodeURI(matches[1])));
+						links.push(url.resolve(strurl,matches[1]));
+//						links.push(url.resolve(strurl,encodeURI(matches[1])));
 					}
 				}
 				elements.each(function (){

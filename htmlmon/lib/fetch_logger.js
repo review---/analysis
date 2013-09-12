@@ -1,4 +1,4 @@
-//var sys    = require('util');
+var sys    = require('util');
 var common = require(__dirname + '/common.js');
 var mongodb = require('mongodb');
 var sync = require('synchronize');

@@ -104,14 +104,19 @@ try {
   help(1);
 }
 
-if ( CONF ) {
-  var conf = require(path.resolve(CONF)).get();
-	COND        = conf.COND;
-	FIELD       = common.cond_default(conf.FIELD,FIELD);
-	MONGO_QUERY = common.cond_default(conf.QUERY,MONGO_QUERY);
-	OUT         = common.cond_default(conf.OUT,OUT);
-	MONGO_NODE  = common.cond_default(conf.NODE,MONGO_NODE);
+var conf = {
+	FIELD: 'body',
+	QUERY: {},
+	COND : ['body']
 }
+if ( CONF ) {
+  conf = require(path.resolve(CONF)).get();
+}
+COND        = conf.COND;
+FIELD       = common.cond_default(conf.FIELD,FIELD);
+MONGO_QUERY = common.cond_default(conf.QUERY,MONGO_QUERY);
+OUT         = common.cond_default(conf.OUT,OUT);
+MONGO_NODE  = common.cond_default(conf.NODE,MONGO_NODE);
 
 var LOG   = DATA_DIR + '/htmlpick.log';
 var log = require( __dirname + '/lib/log.js').log(LOG,LOGLV).init();

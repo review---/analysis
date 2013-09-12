@@ -22,7 +22,7 @@ var LV_ECHO    =  2;
 var LV_ERROR   =  0;
 
 var log_file;
-var log_lv     = LV_INFO;
+var log_lv     = LV_OK;
 
 
 //---------------------------------
