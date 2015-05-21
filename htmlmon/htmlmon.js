@@ -252,8 +252,9 @@ var C   = require( __dirname + '/lib/fetch_cookie.js').fetch_cookie(CSTORAGE);
 C = {
   init: function(){},
   load: function(){},
+  get: function(){},
   store: function(){},
-}
+};
 
 function fork_worker(){
   var worker = child_process.spawn(cmd,child_argv);
