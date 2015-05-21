@@ -398,7 +398,9 @@ function do_worker(){
 			}
 			});
 		}
-		loopInterval = setInterval(loop,SETTING.WAIT);
+		if ( !loopInterval ){
+			loopInterval = setInterval(loop,SETTING.WAIT);
+		}
 	}catch ( e ) {
 		log.error(SETTING.URL,'LOOP','catch',e.stack);
 		return;
