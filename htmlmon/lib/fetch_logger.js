@@ -4,25 +4,40 @@ var mongodb = require('mongodb');
 var sync = require('synchronize');
 
 //---------------------------------
-// constructor 
+// constructor
 //---------------------------------
-function FetchLogger(node,colname) {
-	var mongo = common.parse_mongo(node);
+function FetchLogger(mongo,colname) {
 	this.host   = mongo.host;
 	this.port   = mongo.port;
 	this.dbname = mongo.dbname;
 	this.colname= colname;
+	this.authdbname = mongo.authdbname;
+	this.user = mongo.user;
+	this.pass = mongo.pass;
 }
 
 FetchLogger.prototype.init = function(drop) {
-	this.db = new mongodb.Db(this.dbname,
-														mongodb.Server(this.host,this.port),
-													 { safe:true}
-														);
-	sync.await(this.db.open(sync.defer()));
+	if ( this.authdbname ) {
+		this.authdb = new mongodb.Db(
+			this.authdbname,
+			mongodb.Server(this.host,this.port),
+			{ safe:true}
+		);
+		sync.await(this.authdb.open(sync.defer()));
+		sync.await(this.authdb.authenticate(this.user, this.pass, sync.defer()));
+		this.db = this.authdb.db(this.dbname);
+	} else {
+		this.db = new mongodb.Db(
+			this.dbname,
+			mongodb.Server(this.host,this.port),
+			{ safe:true}
+		);
+		sync.await(this.db.open(sync.defer()));
+	}
+
 	this.col = this.db.collection(this.colname);
 	if ( drop ) {
-		try { 
+		try {
 			sync.await(this.col.drop(sync.defer()));
 			sync.await(this.col.ensureIndex({ts:1},sync.defer()));
 		}catch(e){
@@ -30,9 +45,9 @@ FetchLogger.prototype.init = function(drop) {
 	}
 //	sync.await(this.col.ensureIndex({status:1},sync.defer()));
 //	sync.await(this.col.ensureIndex({code:1},sync.defer()));
-//	sync.await(this.col.update( 
+//	sync.await(this.col.update(
 //														 {status:{'$ne': 'End'} },
-//														 { '$set' : {status:'Queuing',code:'queuing...'} } , 
+//														 { '$set' : {status:'Queuing',code:'queuing...'} } ,
 //														 { multi : true } , sync.defer()));
 }
 
@@ -50,13 +65,13 @@ FetchLogger.prototype.body = function( url , status,header,body ) {
 	};
 	sync.await(this.col.save( data, sync.defer()));
 }
-exports.fetch_logger = function(node,dbname,colname) {
-	return new FetchLogger(node,dbname,colname);
+exports.fetch_logger = function(mongo, colname) {
+	return new FetchLogger(mongo, colname);
 }
 
 /*
 var fetch_logger_dir;
-exports.fetch_logger = function(dir) { 
+exports.fetch_logger = function(dir) {
   if ( dir )  fetch_logger_dir = path.resolve(dir);
   return this;
 }

@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-// Install these packages.
-//   npm install getopt
-//   npm install jsdom
-//   npm install request
-//   npm install synchronize
-//   npm install iconv
 
 process.eputs = function(str){
   process.stderr.write(str+'\n');
@@ -168,10 +162,9 @@ try {
   help(1);
 }
 
-
-
 var stdtest = require( __dirname + '/lib/stdtest.js');
 
+var mongo = common.parse_mongo(MONGO_NODE);
 var SETTING = {
   URL      : null,
   PROXY    : null,
@@ -181,6 +174,14 @@ var SETTING = {
   TEST     : stdtest.STATUS_TEST,
   VERBOSE  : null,
   PARALLEL : 1,
+  MONGO: {
+		host: mongo.host,
+		port: mongo.port,
+		dbname: mongo.dbname,
+		user: null,
+		pass: null,
+		authdbname: null,
+	},
 }
 
 if ( CONF ) {
@@ -203,7 +204,7 @@ SETTING.VERBOSE =common.cond_default(VERBOSE,SETTING.VERBOSE);
 SETTING.PARALLEL=common.cond_default(PARALLEL,SETTING.PARALLEL);
 
 //---------------
-// Validate 
+// Validate
 if ( ! SETTING.URL ) {
   process.eputs('=== NO URL ! ===' );
   help(1);
@@ -228,8 +229,8 @@ var STORAGE_FILE = require( __dirname + '/lib/storage_file.js');
 //var FFILE = DATA_DIR + '/' + SETTING.TEST_NAME + '.f';
 //var FSTORAGE = STORAGE_FILE.storage_file(FFILE);
 //var F   = require( __dirname + '/lib/fetch_list.js').fetch_list(FSTORAGE);
-var F   = require( __dirname + '/lib/fetch_list.js').fetch_list(MONGO_NODE,SETTING.TEST_NAME+'.q');
-var L   = require( __dirname + '/lib/fetch_logger.js').fetch_logger(MONGO_NODE,SETTING.TEST_NAME);
+var F   = require( __dirname + '/lib/fetch_list.js').fetch_list(SETTING.MONGO, SETTING.TEST_NAME+'.q');
+var L   = require( __dirname + '/lib/fetch_logger.js').fetch_logger(SETTING.MONGO, SETTING.TEST_NAME);
 
 if ( VERBOSE ) {
 	SETTING.FETCH_BODY = true;
@@ -271,19 +272,19 @@ var TERM_FLG = false; // signal flag
 //----------------------------------------------
 // Control process ( parent )
 //----------------------------------------------
-if ( ! WORKER ) { 
+if ( ! WORKER ) {
   var child_process  = require('child_process');
   var cmd = process.argv.shift();
-	
+
   var child_argv = process.argv.concat();
   child_argv.push('-W');
-	
-	
+
+
   process.on('SIGINT', function () {
     process.eputs('SIGINT Received !');
     TERM_FLG = true;
   });
-	
+
   fork_worker();
   child_argv.push('-R');
 	for ( var i in child_argv ){
@@ -330,12 +331,12 @@ function do_worker(){
 		}else{
 			for ( var i in SETTING.URL ) {
 				F.queuing(SETTING.URL[i],SETTING.TEST);
-				
+
 			}
 		}
 		log.echo(SETTING.URL,'=== START ===',SETTING.TEST_NAME);
 	}
-	
+
   //---------------
   // Fetch loop
 	try {
@@ -344,8 +345,10 @@ function do_worker(){
 			try{
 				var q = F.queuing(url,test,referer);
 				if ( q ) {
-					log.message(url,'','skip queuing');
+					log.message(url, referer, 'skip queuing');
 					return;
+				} else {
+					log.message(url, referer, 'queuing');
 				}
 				//setTimeout(loop,SETTING.WAIT); // Wait for fetching
 			}catch(e){
@@ -407,7 +410,7 @@ sync.fiber(function(){
 });
 
 //-----------------------------------
-// 
+//
 //-----------------------------------
 
 function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
@@ -438,7 +441,7 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
     reqHeaders['Referer'] = referer;
   }
   log.trace(strurl,'TRY');
-	
+
   var rpath = parsed.pathname+common.cond_default(parsed.search,'');
 
 //	var j = request.jar();
@@ -452,7 +455,7 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 	};
 	var req = request( req_options , function ( error , res , body ) {
 		sync.fiber(function(){
-			try { 
+			try {
 				if ( error ) {
 					if ( error.code === 'ETIMEDOUT' ) {
 						if ( F.timeout(strurl) ) {
@@ -480,7 +483,7 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 					return;
 				}
 				C.store(parsed.hostname,res.headers['set-cookie']);
-				
+
 				if ( res.statusCode === 302 || res.statusCode === 301 ) {
 					F.skip_fetching(strurl,'REDIRECT');
 					var location = url.resolve(strurl,res.headers['location']);
@@ -516,6 +519,9 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 				var match = /^text.+charset=(.+)$/.exec(content_type);
 				if ( match ) {
 					var charset = match[1];
+					if ( /windows.?31j/i.test(charset)) {
+						charset = 'CP932'
+					}
 					if ( charset && charset !== 'utf-8' ) {
 						conv = new iconv.Iconv(charset,'UTF-8//TRANSLIT//IGNORE');
 						body = conv.convert(body);
@@ -546,7 +552,7 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
       }
 		}); // sync.fiber
 	});
-	
+
 	function do_filter ( pre, target , FILTER ) {
 		for ( var i in FILTER.ERROR ) {
 			if ( RegExp(FILTER.ERROR[i]).test(target) ) {
@@ -555,14 +561,14 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 				return false;
       }
 		}
-    
+
 		for ( var i in FILTER.IGNORE ) {
       if ( RegExp(FILTER.IGNORE[i]).test(target) ) {
 				log.message(strurl,FILTER.IGNORE[i],pre+' >(ignore)',target);
 				return false;
       }
     }
-		
+
     for ( var i in FILTER.FOLLOW ) {
       if ( RegExp(FILTER.FOLLOW[i]).test(target) ) {
 				return true;
@@ -597,7 +603,7 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 					return true;
 				});
 			}
-			
+
 			function uniq_links( elements, links ) {
 				if ( ! links ){
 					links = [];
@@ -656,7 +662,7 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 						try {
 							var CHECK = TEST.CHECKS[i];
 							if ( CHECK.METHOD == 'HOOK' ) {
-								try { 
+								try {
 									var msg = CHECK.HOOK(TEST,strurl,referer,$('#ROOT > html'));
 									if ( msg  ) {
 										log.message(strurl,'HOOK','interrupt by hook',msg);
@@ -679,7 +685,7 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 								}
 							} else {
 								var elements = $('#ROOT > html').find(CHECK.SELECTOR);
- 								log.debug('CHECK('+CHECK.METHOD+')',CHECK.SELECTOR); 
+ 								log.debug('CHECK('+CHECK.METHOD+')',CHECK.SELECTOR);
 								if ( CHECK.METHOD == 'EXIST' ) {
 									var size = elements.size();
 									if ( size === 0 ) {
@@ -742,7 +748,7 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 
 
 /*
-export NODE_PATH=/usr/local/nodejs/lib/node_modules 
+export NODE_PATH=/usr/local/nodejs/lib/node_modules
 node htmlmon.js -u http://cockatoo.jp     -l 20
 node htmlmon.js -u http://cockatoo.jp -S  -l 15
 node htmlmon.js -u http://cockatoo.jp -C  -l 8

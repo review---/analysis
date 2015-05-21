@@ -3,34 +3,50 @@ var common = require(__dirname + '/common.js');
 var mongodb = require('mongodb');
 var sync = require('synchronize');
 
-function FetchList(node,colname) {
-	var mongo = common.parse_mongo(node);
+function FetchList(mongo,colname) {
 	this.host   = mongo.host;
 	this.port   = mongo.port;
 	this.dbname = mongo.dbname;
 	this.colname= colname;
+	this.authdbname = mongo.authdbname;
+	this.user = mongo.user;
+	this.pass = mongo.pass;
 }
 //---------------------------------
-// constructor 
+// constructor
 //---------------------------------
 FetchList.prototype.init = function(drop) {
-	this.db = new mongodb.Db(this.dbname,
-														mongodb.Server(this.host,this.port),
-													 { safe:true}
-														);
-	sync.await(this.db.open(sync.defer()));
+
+	if ( this.authdbname ) {
+		this.authdb = new mongodb.Db(
+			this.authdbname,
+			mongodb.Server(this.host,this.port),
+			{ safe:true}
+		);
+		sync.await(this.authdb.open(sync.defer()));
+		sync.await(this.authdb.authenticate(this.user, this.pass, sync.defer()));
+		this.db = this.authdb.db(this.dbname);
+	} else {
+		this.db = new mongodb.Db(
+			this.dbname,
+			mongodb.Server(this.host,this.port),
+			{ safe:true}
+		);
+		sync.await(this.db.open(sync.defer()));
+	}
+
 	this.col = this.db.collection(this.colname);
 	if ( drop ) {
-		try { 
+		try {
 			sync.await(this.col.drop(sync.defer()));
 		}catch(e){
 		}
 	}
 	sync.await(this.col.ensureIndex({status:1},sync.defer()));
 	sync.await(this.col.ensureIndex({code:1},sync.defer()));
-	sync.await(this.col.update( 
+	sync.await(this.col.update(
 														 {status:{'$ne': 'End'} },
-														 { '$set' : {status:'Queuing',code:'queuing...'} } , 
+														 { '$set' : {status:'Queuing',code:'queuing...'} } ,
 														 { multi : true } , sync.defer()));
 }
 
@@ -38,9 +54,9 @@ FetchList.prototype.init = function(drop) {
 // operator
 //---------------------------------
 FetchList.prototype.resetError = function () {
-	sync.await(this.col.update( 
+	sync.await(this.col.update(
 														 {code:{'$in':[ 'ERROR','TIMEOUT']} },
-														 { '$set' : {status:'Queuing',code:'queuing...'} } , 
+														 { '$set' : {status:'Queuing',code:'queuing...'} } ,
 														 { multi : true } , sync.defer()));
 }
 FetchList.prototype.queuing_count = function () {
@@ -112,16 +128,15 @@ FetchList.prototype.queuing = function (url,test,referer) {
 	if ( data ) {
 		return data;
   }
-//  this.change(url,'Queuing','queuing...');
 	this.change(url,'Queuing',Array(50).join(' '),test,referer);
 	return null;
 }
 FetchList.prototype.fetching = function () {
-	return sync.await(this.col.findAndModify( 
-																					 { status: 'Queuing' },
-																					 {},
-																					 { '$set' : { status: 'Fetching',date:new Date().getTime() } } ,
-																					 { new : true } , sync.defer()));
+	return sync.await(this.col.findAndModify(
+		{ status: 'Queuing' },
+		{},
+		{ '$set' : { status: 'Fetching',date:new Date().getTime() } } ,
+		{ new : true } , sync.defer())).value;
 }
 
 //---------------------------------
@@ -152,6 +167,6 @@ FetchList.prototype.length = function () {
 // utilities
 //---------------------------------
 
-exports.fetch_list = function(node,colname) {
-	return new FetchList(node,colname);
+exports.fetch_list = function(mongo,colname) {
+	return new FetchList(mongo,colname);
 }
