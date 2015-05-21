@@ -386,11 +386,15 @@ function do_worker(){
 					log.echo(SETTING.URL,'=== FINISH ===',SETTING.TEST_NAME);
 					process.exit(0);
 				}
-				if ( F.fetching_count() < SETTING.PARALLEL ){
-					var q = F.fetching();
-					if ( q ) {
-						log.echo(q._id,Math.floor(m.heapUsed/(1024*1024)*100)/100 + ' / ' + Math.floor(m.heapTotal/(1024*1024)*100)/100 + ' (MB)','Q:' + F.queuing_count() + '  F:' + F.fetching_count());
-						fetch_content(q._id,q.headers,q.test,q.referer,add_queue);
+				for( var i = 0; i < SETTING.TEST_NAME; i++ ) {
+					if ( F.fetching_count() < SETTING.PARALLEL ){
+						var q = F.fetching();
+						if ( q ) {
+							log.echo(q._id,Math.floor(m.heapUsed/(1024*1024)*100)/100 + ' / ' + Math.floor(m.heapTotal/(1024*1024)*100)/100 + ' (MB)','Q:' + F.queuing_count() + '  F:' + F.fetching_count());
+							fetch_content(q._id,q.headers,q.test,q.referer,add_queue);
+						}
+					}else{
+						break;
 					}
 				}
 			}catch(e){
