@@ -386,7 +386,7 @@ function do_worker(){
 					log.echo(SETTING.URL,'=== FINISH ===',SETTING.TEST_NAME);
 					process.exit(0);
 				}
-				for( var i = 0; i < SETTING.TEST_NAME; i++ ) {
+				for( var i = 0; i < SETTING.PARALLEL; i++ ) {
 					if ( F.fetching_count() < SETTING.PARALLEL ){
 						var q = F.fetching();
 						if ( q ) {
