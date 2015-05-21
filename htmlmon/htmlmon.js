@@ -247,7 +247,13 @@ if (! SETTING.FETCH_BODY) {
 var CFILE = DATA_DIR + '/' + SETTING.TEST_NAME + '.c';
 var CSTORAGE = STORAGE_FILE.storage_file(CFILE);
 var C   = require( __dirname + '/lib/fetch_cookie.js').fetch_cookie(CSTORAGE);
-
+// TODO: Disable cookie
+// Should be in the queue document.
+C = {
+  init: function(){},
+  load: function(){},
+  store: function(){},
+}
 
 function fork_worker(){
   var worker = child_process.spawn(cmd,child_argv);
