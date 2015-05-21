@@ -44,6 +44,7 @@ FetchList.prototype.init = function(drop) {
 	}
 	sync.await(this.col.ensureIndex({status:1},sync.defer()));
 	sync.await(this.col.ensureIndex({code:1},sync.defer()));
+	sync.await(this.col.ensureIndex({referer:1},sync.defer()));
 	sync.await(this.col.update(
 														 {status:{'$ne': 'End'} },
 														 { '$set' : {status:'Queuing',code:'queuing...'} } ,
@@ -75,17 +76,20 @@ FetchList.prototype.target_count = function () {
 }
 
 FetchList.prototype.change = function (url,pharse,code,test,referer) {
-	var data = { status: pharse,date:new Date().getTime() };
+	var update = { status: pharse,date:new Date().getTime() };
 	if ( code ) {
-		data['code'] = code;
+		update['code'] = code;
 	}
 	if ( test ) {
-		data['test'] = test;
+		update['test'] = test;
+	}
+	var data = {
+		$set: update
 	}
 	if ( referer ) {
-		data['referer'] = referer;
+		data['$addToSet'] = { referer: referer }
 	}
-	sync.await(this.col.update( { _id : url}, { '$set' : data } , { upsert : true } , sync.defer()));
+	sync.await(this.col.update( { _id : url}, data, { upsert : true } , sync.defer()));
 }
 
 FetchList.prototype.requeuing = function (url) {
