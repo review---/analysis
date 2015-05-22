@@ -185,8 +185,7 @@ var SETTING = {
 }
 
 if ( CONF ) {
-  conf = require(path.resolve(CONF));
-  SETTING = conf.get();
+  SETTING = require(path.resolve(CONF)).get();
 }
 // Override member on config
 SETTING.TEST_NAME = common.cond_default(TEST_NAME,SETTING.TEST_NAME);;

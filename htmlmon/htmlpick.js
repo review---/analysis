@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Install these packages.
-//   npm install getopt
-//   npm install jsdom
 process.eputs = function(str){
   process.stderr.write(str+'\n');
 }
@@ -21,7 +18,7 @@ var sync = require('synchronize');
 //----------------------------------------------
 // Definitions
 //----------------------------------------------
-var MEM_THRESHOLD = 300*1024*1024; // byte
+var MEM_THRESHOLD = 2000*1024*1024; // byte
 var DATA_DIR = __dirname + '/data';
 
 //---------------
@@ -29,6 +26,11 @@ var DATA_DIR = __dirname + '/data';
 process.chdir(__dirname);
 var common = require(__dirname + '/lib/common.js');
 common.mkdirp(DATA_DIR);
+
+ST_QUEUED = 0
+ST_PROCESSING = 1
+ST_DONE = 2
+ST_ERROR = -1
 
 //----------------------------------------------
 // Options
@@ -38,13 +40,11 @@ var WORKER  = null;
 var JOBS    = 1;
 var LOGLV   =  6;
 var FILE    = null;
-var MONGO_NODE =null;
-var FIELD='body';
-var MONGO_QUERY={};
-var OUT='STDOUT';
-var CLEAR=null;
+var INPUT =null;
+var OUTPUT=null
+var RESUME  = null;
+var CREATEJOB=null;
 var CONF    = null;
-var COND    = null;
 
 var TERM_FLG = false; // signal flag
 process.on('SIGINT', function () {
@@ -58,10 +58,10 @@ function help(a){
   sys.puts('Options:');
   sys.puts('   -l <loglv>     : Specify the loglv from 0 to 20 ( 6 is defalut )');
   sys.puts('   -f <inputfile> : Specify htmlfile otherwise read html from STDIN');
-  sys.puts('   -o <method>    : Output method      > STDOUT or 172.0.0.1:27017/db.col');
-  sys.puts('   -m <node>      : MongoDB instance   > 127.0.0.1:27017/db.col');
+  sys.puts('   -o <node>      : MongoDB instance as output   > 172.0.0.1:27017/db.col');
+  sys.puts('   -m <node>      : MongoDB instance as input    > 127.0.0.1:27017/db.col');
   sys.puts('   -c <conf-file> : Config file');
-  sys.puts('   -C             : Clear job collection');
+  sys.puts('   -C             : Create new job');
   sys.puts('   -j <number>    : # Job process');
   process.exit(a);
 }
@@ -80,16 +80,16 @@ try {
       FILE = ''+p;
       break;
       case 'm':
-      MONGO_NODE = ''+p;
+      INPUT = ''+p;
       break;
       case 'c':
       CONF = ''+p;
       break;
       case 'o':
-      OUT = ''+p;
+      OUTPUT = ''+p;
       break;
       case 'C':
-      CLEAR = true;
+      CREATEJOB = true;
       break;
       case 'j':
       JOBS = ''+p;
@@ -104,19 +104,45 @@ try {
   help(1);
 }
 
-var conf = {
-	FIELD: 'body',
-	QUERY: {},
-	COND : ['body']
+var SETTING = {
+  FIELDS : {
+		body: 'body'
+	}
 }
 if ( CONF ) {
-  conf = require(path.resolve(CONF)).get();
+  SETTING = require(path.resolve(CONF)).get();
 }
-COND        = conf.COND;
-FIELD       = common.cond_default(conf.FIELD,FIELD);
-MONGO_QUERY = common.cond_default(conf.QUERY,MONGO_QUERY);
-OUT         = common.cond_default(conf.OUT,OUT);
-MONGO_NODE  = common.cond_default(conf.NODE,MONGO_NODE);
+SETTING.FILE = common.cond_default(FILE, SETTING.FILE);
+SETTING.MODIFY = common.cond_default(SETTING.MODIFY, function (ret) { return ret; });
+
+if (OUTPUT) {
+	var mongo = common.parse_mongo(OUTPUT);
+	SETTING.DST = {
+		host: mongo.host,
+		port: mongo.port,
+		dbname: mongo.dbname,
+		colname: mongo.colname,
+		user: null,
+		pass: null,
+		authdbname: null,
+	};
+}
+
+if (INPUT) {
+	var mongo = common.parse_mongo(INPUT);
+	SETTING.SRC = {
+		host: mongo.host,
+		port: mongo.port,
+		dbname: mongo.dbname,
+		colname: mongo.colname,
+		fieldname: 'body',
+		query: {},
+		user: null,
+		pass: null,
+		authdbname: null,
+	};
+}
+
 
 var LOG   = DATA_DIR + '/htmlpick.log';
 var log = require( __dirname + '/lib/log.js').log(LOG,LOGLV).init();
@@ -135,15 +161,15 @@ function fork_worker(){
     if ( code === 2 && !TERM_FLG ) {
 				fork_worker();
     }else{
-		
+
 		}
 		});
 	});
 }
-if ( ! WORKER ) { 
+if ( ! WORKER ) {
   var child_process  = require('child_process');
   var cmd = process.argv.shift();
-	
+
   var child_argv = process.argv.concat();
   child_argv.push('-W');
 	var jobs = parseInt(JOBS);
@@ -170,30 +196,37 @@ sync.fiber(function(){
 	var out = new StdOut();
 
 	function MongoOut(){
-		var mongo = common.parse_mongo(OUT);
-		var host   = mongo.host;
-		var port   = mongo.port;
-		var dbname = mongo.dbname;
-		var colname= mongo.colname;
-		this.db = new mongodb.Db(dbname,
-														 mongodb.Server(host,port),
-														 { safe:true}
-														 );
-		sync.await(this.db.open(sync.defer()));
-		this.col = this.db.collection(colname);
+		if ( SETTING.DST.authdbname ) {
+			this.authdb = new mongodb.Db(
+				SETTING.DST.authdbname,
+				mongodb.Server(SETTING.DST.host,SETTING.DST.port),
+				{ safe:true}
+			);
+			sync.await(this.authdb.open(sync.defer()));
+			sync.await(this.authdb.authenticate(SETTING.DST.user, SETTING.DST.pass, sync.defer()));
+			this.db = this.authdb.db(SETTING.DST.dbname);
+		} else {
+			this.db = new mongodb.Db(
+				SETTING.DST.dbname,
+				mongodb.Server(SETTING.DST.host,SETTING.DST.port),
+				{ safe:true}
+			);
+			sync.await(this.db.open(sync.defer()));
+		}
+		this.col = this.db.collection(SETTING.DST.colname);
 	}
 	MongoOut.prototype.out = function(ret){
 		log.message(ret._id,'mongoout','','');
-		ret.st  = 'success'
+		ret.res  = 'success'
 		ret.ts  = new Date().getTime();
 		this.col.save(ret,function(){});
 	}
 	MongoOut.prototype.err = function(id,reason){
 		log.error(id,'error','','');
+		console.log('********', reason);
 		var ret = {};
 		ret._id = id;
-		ret.st  = 'error';
-		ret.reason  = reason;
+		ret.res  = 'error';
 		ret.ts  = new Date().getTime();
 		this.col.save(ret,function(){});
 	}
@@ -203,110 +236,115 @@ sync.fiber(function(){
 			sync.await(this.col.drop(sync.defer()));
 		}catch(e){
 		}
-		sync.await(this.col.ensureIndex({st:1},sync.defer()));
 	}
-	if ( OUT !== 'STDOUT' ) {
+	if ( SETTING.DST ) {
 		out = new MongoOut();
 	}
-	
 
-
-
-
-	function HtmlPicker(out){
-		this.out = out;
+	function HtmlPicker(){
 	}
-	HtmlPicker.prototype.pick = function (id,body,conds,end){
-		var out = this.out;
-		if ( ! end ) {
-			end = function(){}
+	HtmlPicker.prototype.pick = function (html,fields,done){
+		if ( ! done ) {
+			done = function(){}
 		}
-		if ( ! body ) {
-			process.eputs('=== NO BODY ! ===' );
-			process.eputs(id['$oid']);
-			return;
-		}
-		try { 
+		try {
+			if ( ! html ) {
+				throw 'Empty contents'
+			}
 			jsdom.env({
-				html: body,
+				html: html,
 				scripts: [path.resolve(__dirname, JQUERY)],
 				done: function (errors, window) {
 					jsdom.jQueryify(window, function (window, $) {
 						sync.fiber(function(){
 							try {
-									$('script').text('');
-									$('style').text('');
-								var text ='';
-								for ( var i in conds ) {
-									var cond = conds[i];
-										$(cond).text().split("\n").forEach(function(l){
-											var line = l.replace(/^\s+/,'').replace(/\s+/m,' ');
-											if ( line && line != ' ' ) {
-												text += line;
-											}
-										});
-									
+								$('script').text('');
+								$('style').text('');
+								var result = {}
+								for ( var field in fields ) {
+									if ( !result[field] ) {
+										result[field] = ''
+									}
+									var selector = fields[field];
+									$(selector).text().split("\n").forEach(function(l){
+										var line = l.replace(/^\s+/,'').replace(/\s+/m,' ');
+										if ( line && line != ' ' ) {
+											result[field] += line;
+										}
+									});
 								}
-								var ret = { _id : id , body: text };
-								out.out(ret);
-								end(id,ret);
+								done(null, result);
 							}catch(e){
-								out.err(id,e);
-								end(id);
+								done(e);
 							}
 						}); // sync.fiber
 					}); // jquery-1.4.4.js
 				}
-			});				
+			});
 		}catch(e){
-			out.err(id,e);
-			end(id);
+			done(e);
 		}
 	}
-	
-	
-	var P = new HtmlPicker(out);
-	if ( MONGO_NODE ) {
+
+	var P = new HtmlPicker();
+	if ( SETTING.SRC ) {
 		fromMongo();
 		return;
 	}
-	
-	if ( FILE ) {
+
+	if ( SETTING.FILE ) {
 		fromFile();
 		return;
 	}
 	fromStdIn();
 
 
-	function gettext(id,body,callback){
-		P.pick(id,body,COND,callback);
+	function picktext(id, html, done){
+		P.pick(html, SETTING.FIELDS, function(err, ret){
+			if ( err ) {
+				out.err(id, err);
+			} else {
+				ret._id = id;
+				ret = SETTING.MODIFY(ret);
+				out.out(ret);
+			}
+			done(err, id);
+		});
 	}
 
 	function fromMongo(){
-		var node = MONGO_NODE;
-		log.echo(colname,'=== START (MONGO) ===',FIELD,node);
-		var mongo = common.parse_mongo(node);
-		var host   = mongo.host;
-		var port   = mongo.port;
-		var dbname = mongo.dbname;
-		var colname= mongo.colname;
+		log.echo(SETTING.SRC.colname,'=== START (MONGO) ===', SETTING.SRC.dbname);
 		sync.fiber(function(){
-			var db = new mongodb.Db(dbname,
-															mongodb.Server(host,port),
-															{ safe:true}
-															);
+			var db = null;
 			try {
-				sync.await(db.open(sync.defer()));
-				var col = db.collection(colname);
-				var job = db.collection(colname+'.job');
-				if ( CLEAR ) {
+				if ( SETTING.SRC.authdbname ) {
+					var authdb = new mongodb.Db(
+						SETTING.SRC.authdbname,
+						mongodb.Server(SETTING.SRC.host,SETTING.SRC.port),
+						{ safe:true}
+					);
+					sync.await(authdb.open(sync.defer()));
+					sync.await(authdb.authenticate(SETTING.SRC.user, SETTING.SRC.pass, sync.defer()));
+					db = authdb.db(SETTING.SRC.dbname);
+				} else {
+					db = new mongodb.Db(
+						SETTING.SRC.dbname,
+						mongodb.Server(SETTING.SRC.host,SETTING.SRC.port),
+						{ safe:true}
+					);
+					sync.await(db.open(sync.defer()));
+				}
+
+				var col = db.collection(SETTING.SRC.colname);
+				var job = db.collection(SETTING.SRC.colname + '.job');
+				if ( CREATEJOB ) {
 					out.drop();
 					try {
 						sync.await(job.drop(sync.defer()));
 					}catch(e){
 					}
 					try {
-						var cursor = sync.await(col.find(MONGO_QUERY,{_id:1},sync.defer()));
+						var cursor = sync.await(col.find(SETTING.SRC.query, {_id: 1}, sync.defer()));
 						var count = sync.await(cursor.count(sync.defer()));
 						var fcount = 0;
 						cursor.each(function(e,obj){
@@ -314,15 +352,15 @@ sync.fiber(function(){
 								cursor.close();
 								return;
 							}
-							obj.st=0;
+							obj.st = ST_QUEUED;
 							job.insert(obj,function(){fcount++;});
 						});
 						var interval = setInterval(function(){
 							sync.fiber(function(){
 								if ( fcount == count ) {
 									clearInterval(interval);
-									sync.await(job.ensureIndex({st:1},sync.defer()));
-									log.echo(colname,'=== CLEAR (MONGO) ===',fcount,node);
+									sync.await(job.ensureIndex({st: 1},sync.defer()));
+									log.echo(SETTING.SRC.colname,'=== CREATEJOB (MONGO) ===',fcount);
 									setTimeout(function(){
 										db.close();
 										process.exit(0);
@@ -331,7 +369,7 @@ sync.fiber(function(){
 							});
 						},1000);
 					}catch(e){
-						log.error(colname,e,'',node);
+						log.error(SETTING.SRC.colname,e,'');
 						process.exit(0);
 					}
 					return;
@@ -339,7 +377,7 @@ sync.fiber(function(){
 				while (true ){
 					var m = process.memoryUsage();
 					if (  TERM_FLG  || m.heapUsed >  MEM_THRESHOLD ) {
-						log.echo('=== Interrupt ===',m.heapUsed + ' > ' + MEM_THRESHOLD,colname);
+						log.echo('=== Interrupt ===',m.heapUsed + ' > ' + MEM_THRESHOLD,SETTING.SRC.colname);
 						setTimeout(function(){
 							db.close();
 							process.exit(2);
@@ -347,47 +385,46 @@ sync.fiber(function(){
 						return;
 					}
 					var prev = sync.await(job.findAndModify(
-																									{st:0},
-																									{},
-																									{'$set':{st:1}},
-																									{},
-																									sync.defer()));
+						{st: ST_QUEUED},
+						{},
+						{'$set':{st: ST_PROCESSING}},
+						{},
+						sync.defer())).value;
 					if ( !(prev && '_id' in prev) ) {
 						setTimeout(function(){
-							log.echo('=== END (MONGO) ===','No job',colname);
+							log.echo('=== END (MONGO) ===','No job',SETTING.SRC.colname);
 							db.close();
 							process.exit(0);
 						},3000);
 						return;
 					}
 					var filter = {};
-					filter[FIELD] = 1;
+					filter[SETTING.SRC.fieldname] = 1;
 					var doc = sync.await(col.findOne({_id:prev._id},filter,sync.defer()));
-					gettext(doc._id,doc[FIELD],function(id,ret){
-						sys.puts(id);
-						if ( ret ) {
-							job.update({_id:id},{'$set':{st:2}},function(){});
+					picktext(doc._id,doc[SETTING.SRC.fieldname],function(err, id){
+						if ( err ) {
+							job.update({_id:id},{'$set':{st: ST_ERROR}},function(){});
 						}else{
-							job.update({_id:id},{'$set':{st:-1}},function(){});
+							job.update({_id:id},{'$set':{st: ST_DONE}},function(){});
 						}
 					});
 				}
 			}catch(e){
-				log.error(colname,e,'',node);
+				log.error(SETTING.SRC.colname,e,'');
 				process.exit(0);
 			}
 		});
 	}
 	function fromFile(){
-		log.echo(FILE,'=== START (FILE) ===',FIELD);
-		var html = fs.readFileSync(FILE);
-		gettext(FILE,html);
+		log.echo(SETTING.FILE,'=== START (FILE) ===');
+		var html = fs.readFileSync(SETTING.FILE);
+		picktext(SETTING.FILE,html);
 		setTimeout(function(){
 			process.exit(0);
 		},5000);
 	}
 	function fromStdIn(){
-		log.echo('STDIN','=== START (STDIN) ===',FIELD);
+		log.echo('STDIN','=== START (STDIN) ===');
 		function procline(chunk,end){
 			var lines = chunk.split("\n");
 			var ret;
@@ -399,8 +436,7 @@ sync.fiber(function(){
 				if ( ! line ) {
 					continue;
 				}
-				var json = JSON.parse(line);
-				gettext(json._id,json[FIELD]);
+				picktext(json._id,line);
 			}
 			return ret;
 		}
@@ -416,6 +452,5 @@ sync.fiber(function(){
 			},5000);
 		});
 	}
-	
-});
 
+});

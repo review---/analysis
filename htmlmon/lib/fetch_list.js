@@ -42,9 +42,9 @@ FetchList.prototype.init = function(drop) {
 		}catch(e){
 		}
 	}
-	sync.await(this.col.ensureIndex({status:1},sync.defer()));
-	sync.await(this.col.ensureIndex({code:1},sync.defer()));
-	sync.await(this.col.ensureIndex({referer:1},sync.defer()));
+	sync.await(this.col.ensureIndex({status: 1},sync.defer()));
+	sync.await(this.col.ensureIndex({code: 1},sync.defer()));
+	sync.await(this.col.ensureIndex({referer: 1},sync.defer()));
 	sync.await(this.col.update(
 														 {status:{'$ne': 'End'} },
 														 { '$set' : {status:'Queuing',code:'queuing...'} } ,
