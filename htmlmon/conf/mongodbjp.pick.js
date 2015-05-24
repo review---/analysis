@@ -1,9 +1,24 @@
-exports.get = function() { 
+exports.get = function() {
   return {
-    NODE    : '127.0.0.1:27017/htmlmon.mongodbjp',
-    OUT     : '127.0.0.1:27017/htmlmon.mongodbjp.out',
-    FIELD    : 'body',
-    QUERY    : {},
-		COND     : ['div.mainContents']
+		SRC : {
+			host: 'localhost',
+			port: 27017,
+			dbname: 'test',
+			colname: 'mongodbjp',
+			fieldname: 'body',
+			query: {},
+		},
+		DST : {
+			host: 'localhost',
+			port: 27017,
+			dbname: 'test',
+			colname: 'mongodbjp.out',
+		},
+		FIELDS : {
+			body: 'body'
+		},
+		MODIFY : function(doc) {
+			return doc;
+		}
   };
 }

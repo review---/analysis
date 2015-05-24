@@ -16,7 +16,6 @@ function FetchList(mongo,colname) {
 // constructor
 //---------------------------------
 FetchList.prototype.init = function(drop) {
-
 	if ( this.authdbname ) {
 		this.authdb = new mongodb.Db(
 			this.authdbname,
@@ -144,33 +143,8 @@ FetchList.prototype.fetching = function () {
 }
 
 //---------------------------------
-// operator
-//---------------------------------
-FetchList.prototype.pushAll = function ( urls, headers , test ,referer ) {
-	for ( var i in urls ) {
-		fetch_queue_q.push({URL:urls[i],TEST:test,REFERER:referer});
-	}
-  save();
-}
-FetchList.prototype.push = function ( url , headers , test , referer ) {
-  fetch_queue_q.push({URL:url,TEST:test,REFERER:referer});
-  save();
-}
-
-FetchList.prototype.pop  = function () {
-  var ret = fetch_queue_q.pop();
-  save();
-  return ret;
-}
-
-FetchList.prototype.length = function () {
-  return fetch_queue_q.length;
-}
-
-//---------------------------------
 // utilities
 //---------------------------------
-
 exports.fetch_list = function(mongo,colname) {
 	return new FetchList(mongo,colname);
 }

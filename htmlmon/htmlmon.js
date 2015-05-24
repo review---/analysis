@@ -174,6 +174,7 @@ var SETTING = {
   TEST     : stdtest.STATUS_TEST,
   VERBOSE  : null,
   PARALLEL : 1,
+  USECOOKIE: true,
   MONGO: {
 		host: mongo.host,
 		port: mongo.port,
@@ -216,18 +217,6 @@ SETTING.TEST_NAME = common.cond_default(SETTING.TEST_NAME,md5sum.update(JSON.str
 var LOG   = DATA_DIR + '/' + SETTING.TEST_NAME + '.log';
 var log = require( __dirname + '/lib/log.js').log(LOG,LOGLV).init();
 
-//var LDIR  = DATA_DIR + '/' + SETTING.TEST_NAME;
-//var L   = require( __dirname + '/lib/fetch_logger.js').fetch_logger(LDIR).init(VERBOSE);
-
-var STORAGE_FILE = require( __dirname + '/lib/storage_file.js');
-
-//var QFILE = DATA_DIR + '/' + SETTING.TEST_NAME + '.q';
-//var QSTORAGE = STORAGE_FILE.storage_file(QFILE);
-//var Q   = require( __dirname + '/lib/fetch_queue.js').fetch_queue(QSTORAGE);
-
-//var FFILE = DATA_DIR + '/' + SETTING.TEST_NAME + '.f';
-//var FSTORAGE = STORAGE_FILE.storage_file(FFILE);
-//var F   = require( __dirname + '/lib/fetch_list.js').fetch_list(FSTORAGE);
 var F   = require( __dirname + '/lib/fetch_list.js').fetch_list(SETTING.MONGO, SETTING.TEST_NAME+'.q');
 var L   = require( __dirname + '/lib/fetch_logger.js').fetch_logger(SETTING.MONGO, SETTING.TEST_NAME);
 
@@ -243,17 +232,14 @@ if (! SETTING.FETCH_BODY) {
   };
 }
 
-var CFILE = DATA_DIR + '/' + SETTING.TEST_NAME + '.c';
-var CSTORAGE = STORAGE_FILE.storage_file(CFILE);
-var C   = require( __dirname + '/lib/fetch_cookie.js').fetch_cookie(CSTORAGE);
-// TODO: Disable cookie
-// Should be in the queue document.
-C = {
-  init: function(){},
-  load: function(){},
-  get: function(){},
-  store: function(){},
-};
+var C   = require( __dirname + '/lib/fetch_cookie.js').fetch_cookie(SETTING.MONGO, SETTING.TEST_NAME+'.c');
+if ( !SETTING.USECOOKIE ){
+	C = {
+		init: function(){},
+		get: function(){},
+		store: function(){},
+	};
+}
 
 function fork_worker(){
   var worker = child_process.spawn(cmd,child_argv);
@@ -322,7 +308,6 @@ function do_worker(){
 			F.resetError();
 			log.echo(SETTING.URL,'=== RESET ERRORS ===',SETTING.TEST_NAME );
 		}
-		C.load();
 		log.echo(SETTING.URL,'=== CONTINUE ===',SETTING.TEST_NAME);
 	}else{
 		F.init(true);
@@ -444,7 +429,6 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
   if ( ! reqHeaders['Accept-Language'] ) {
     reqHeaders['Accept-Language'] = 'ja,en-us;q=0.7,en;q=0.3';
   }
-  // @@@ (use cookie flg ... )
   var cookie = C.get(parsed.protocol,parsed.hostname,parsed.path);
   if ( cookie ) {
     reqHeaders['Cookie'] = common.cond_default(reqHeaders['Cookie'],'');
@@ -494,7 +478,7 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
 					TEST.ON_ERROR('RESPONSE : ',strurl,res.statusCode,'BAD STATUS');
 					return;
 				}
-				C.store(parsed.hostname,res.headers['set-cookie']);
+				C.store(parsed.hostname, parsed.path, res.headers['set-cookie']);
 
 				if ( res.statusCode === 302 || res.statusCode === 301 ) {
 					F.skip_fetching(strurl,'REDIRECT');

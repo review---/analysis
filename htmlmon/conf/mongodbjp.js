@@ -4,7 +4,7 @@ var fs  = require('fs');
 var log     = require( __dirname + '/../lib/log.js');
 var stdtest = require( __dirname + '/../lib/stdtest.js');
 // all page
-exports.get = function() { 
+exports.get = function() {
   return {
     TEST_NAME: 'mongodbjp',
     URL      : 'http://www.mongodb.jp/',
@@ -12,7 +12,14 @@ exports.get = function() {
     SSLPROXY : null, // Not supported
     TIMEOUT  : 30000, // msec
     WAIT     : 10,  // msec
-    TEST : { 
+		FETCH_BODY: true,
+		USECOOKIE: true,
+		MONGO : {
+			host: 'localhost',
+			port: 27017,
+			dbname: 'test',
+		},
+    TEST : {
       ON_ERROR : function on_error(pref,strurl,selector,msg,data){
 	// log.error(strurl,selector,'HOOK error',msg);
       },
