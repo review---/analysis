@@ -18,7 +18,7 @@ var sync = require('synchronize');
 //----------------------------------------------
 // Definitions
 //----------------------------------------------
-var MEM_THRESHOLD = 2000*1024*1024; // byte
+var MEM_THRESHOLD = 500*1024*1024; // byte
 var DATA_DIR = __dirname + '/data';
 
 //---------------
@@ -35,7 +35,6 @@ ST_ERROR = -1
 //----------------------------------------------
 // Options
 //----------------------------------------------
-//var JQUERY  = './lib/jquery-1.4.4.js';
 var JQUERY  = './lib/jquery-1.11.3.min.js';
 var WORKER  = null;
 var JOBS    = 1;
