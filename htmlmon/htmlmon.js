@@ -514,7 +514,6 @@ function fetch_content(strurl,reqHeaders,TEST,referer,callback) {
         if ( !match ) {
           match = /Content-Type[^>]+charset=([^"> ]+)"/i.exec(body);
         }
-        console.log(match);
         if ( match ) {
           var charset = match[1];
           if ( /windows.?31j/i.test(charset)) {
